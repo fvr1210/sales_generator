@@ -29,11 +29,17 @@ ui <- dashboardPage(skin = "red",
                     # sidebare ---------
                     dashboardSidebar(disable = TRUE),
                     #* Sales Generator ----
+                    
+                  
+                    
+                    
     dashboardBody(tabItem(tabName = "generator",
+                          
+ 
                           
             fluidRow(    
                 tags$h4("Sales from to"),
-                dateInput("sales_from", "Start date:", value = Sys.Date()-720, format = "dd/mm/yyyy"),
+                dateInput("sales_from", "Start date:", value = Sys.Date()-719, format = "dd/mm/yyyy"),
                 dateInput("sales_to", "End date:", value  = Sys.Date(), format = "dd/mm/yyyy")
                 ),             
             
@@ -48,13 +54,13 @@ ui <- dashboardPage(skin = "red",
                 column(3, textInput(inputId = "EXT_LOC_ID", label = "EXT_LOC_ID", value = "", width = NULL, placeholder = NULL)),
                 verbatimTextOutput("EXT_LOC_ID"),
                 #  LOC_TCD
-                column(3,textInput(inputId = "LOC_TCD", label = "LOC_TCD", value = "", width = NULL, placeholder = NULL)),
+                column(3,textInput(inputId = "LOC_TCD", label = "LOC_TCD", value = "1040", width = NULL, placeholder = NULL)),
                 verbatimTextOutput("LOC_TCD"),
                 #  SALES_UOM
-                column(2, textInput(inputId = "SALES_UOM", label = "SALES_UOM", value = "", width = NULL, placeholder = NULL)),
+                column(2, textInput(inputId = "SALES_UOM", label = "SALES_UOM", value = "EA", width = NULL, placeholder = NULL)),
                 verbatimTextOutput("SALES_UOM"),
                 #  SALES_UOM
-                column(2, textInput(inputId = "LOC_CURRENCY", label = "LOC_CURRENCY", value = "", width = NULL, placeholder = NULL)),
+                column(2, textInput(inputId = "LOC_CURRENCY", label = "LOC_CURRENCY", value = "EUR", width = NULL, placeholder = NULL)),
                 verbatimTextOutput("LOC_CURRENCY")),
                 
            
@@ -139,13 +145,22 @@ ui <- dashboardPage(skin = "red",
                 column(3, numericInput(inputId="holiday_Zweiter.Weihnachtstag", label = 'Weight Weihnachtstag:',
                                        min=0,  value=1))
             ), 
+            # 
+            # fluidRow(
+            #     tags$h4("DIF"),
+            #     actionButton('insertBtn', 'Insert DIF'),
+            #     actionButton('removeBtn', 'Remove DIF'),
+            #     tags$div(id = 'DIF')
+            # ),
+            # 
             
             fluidRow(
                 tags$h4("Sales Data"),
 
                 column(3, numericInput(inputId="lambda", label = 'Expected average sales value',
                                        min = 1, value=5))),
-
+            
+           
             actionButton("generate", "Generate Sales data", style="color: #fff; background-color: #d73925; border-color: #c34113;
                                 border-radius: 10px; 
                              border-width: 2px"),
@@ -166,7 +181,7 @@ ui <- dashboardPage(skin = "red",
                 # dataTableOutput("sales_table"),
                 plotOutput("sales_plot")
             ),
-            
+
             # Button
             downloadButton("downloadData", "Download")
             
@@ -216,7 +231,22 @@ server <- function(input, output) {
 
     
     # 
-
+    observeEvent(input$insertBtn, {
+        insertUI(
+            selector = '#DIF',
+            ui = dateInput("DIF_from", "DIF Start date:", value = Sys.Date()-720, format = "dd/mm/yyyy"),
+                 dateInput("DIF_to", "DIF End date:", value  = Sys.Date(), format = "dd/mm/yyyy"),
+            # ui_3 = numericInput(inputId="DIF_effect", label = 'DIF Effect',
+            #              min=0, value=1)
+             
+        )
+    })
+    
+    # observeEvent(input$removeBtn, {
+    #     removeUI(
+    #         selector = 'div:has(> #sld1)'
+    #     )
+    # })
     
     
 
@@ -225,7 +255,7 @@ server <- function(input, output) {
     # Weights
     
     
-    df5 <- eventReactive(input$generate,{
+    df_full <- eventReactive(input$generate,{
         
 
         dates <- c(input$sales_to, input$sales_from)
@@ -233,22 +263,22 @@ server <- function(input, output) {
         
         obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
         # 
-        df1 <- data.frame(obs_days)  %>% 
+        df_d <- data.frame(obs_days)  %>% 
             mutate(wday = weekdays(obs_days)) %>% 
             mutate(month = months(obs_days)) %>% 
             mutate(year = year(obs_days)) 
         
-        holiday <- make_holidays_df(c(df1$year), "DE")
+        holiday <- make_holidays_df(c(df_d$year), "DE")
         
-        df1 <- left_join(df1, holiday, by = c("obs_days" = "ds"))
+        df_dh <- left_join(df_d, holiday, by = c("obs_days" = "ds"))
         
         
-        df1 <- df1 %>%  
+        df1 <- df_dh %>%  
             mutate(year = as.factor(year)) %>% 
             recipe( ~ .) %>% 
             step_dummy(wday, month, year, holiday, one_hot = T ) %>% 
             prep() %>% 
-            bake(df1) %>% 
+            bake(df_dh) %>% 
             replace(is.na(.), 0) %>% 
             select(where(~ any(. != 0)))
         
@@ -289,20 +319,44 @@ server <- function(input, output) {
 
          log_data <- log(df1_dt[,2:ncol(df1_dt)])
          #
-         df3 <- df1 %>%
-             select(obs_days) %>%
-             cbind(log_data) %>%
-             mutate_if(is.numeric, ~ replace(., is.infinite(.), 0)) %>%
-             mutate(sum_log = rowSums(across(where(is.numeric)))) %>%
-             mutate(sum = exp(sum_log))
-
+         
+         
+         
+         
+         
+         df3 <- df_dh %>%
+             cbind(log_data) %>% 
+             as_tibble() %>% 
+             mutate(year = as.factor(year)) %>% 
+             mutate_if(is.numeric, ~ replace(., is.infinite(.), NA)) %>% 
+             mutate(sum_log = rowSums(select_if(., is.numeric), na.rm = TRUE)) %>% 
+             mutate(sum = exp(sum_log)) %>% 
+             mutate(sum = case_when(
+                 is.na(wday_Montag) & wday == "Montag" ~ 0,
+                 is.na(wday_Dienstag) & wday == "Dienstag" ~ 0,
+                 is.na(wday_Mittwoch) & wday == "Mittwoch" ~ 0,
+                 is.na(wday_Donnerstag) & wday == "Donnerstag" ~ 0,
+                 is.na(wday_Freitag) & wday == "Freitag" ~ 0,
+                 is.na(wday_Samstag) & wday == "Samstag" ~ 0,
+                 is.na(wday_Sonntag) & wday == "Sonntag" ~ 0,
+                 is.na(holiday_Christi.Himmelfahrt) & holiday == "Christi Himmelfahrt" ~ 0,
+                 is.na(holiday_Erster.Mai) & holiday == "Erster Mai" ~ 0,
+                 is.na(holiday_Erster.Weihnachtstag) & holiday == "Erster Weihnachtstag" ~ 0,
+                 is.na(holiday_Karfreitag) & holiday == "Karfreitag" ~ 0,
+                 is.na(holiday_Neujahr) & holiday == "Neujahr" ~ 0,
+                 is.na(holiday_Ostermontag) & holiday == "Ostermontag" ~ 0,
+                 is.na(holiday_Pfingstmontag) & holiday == "Pfingstmontag" ~ 0,
+                 is.na(holiday_Tag.der.Deutschen.Einheit) & holiday == "Tag der Deutschen Einheit" ~ 0,
+                 is.na(holiday_Zweiter.Weihnachtstag) & holiday == "Zweiter Weihnachtstag" ~ 0,
+                 TRUE ~  sum))
 
          lambda <- input$lambda
 
          df4 <- df3 %>%
              select(obs_days, sum) %>%
              mutate(sales = rpois(nrow(df3), lambda = lambda)) %>%
-             mutate(ss_sales = sales*sum)
+             mutate(ss_sales = sales*sum) %>% 
+             as_tibble
 
 
          # df5 <- df4 %>%
@@ -333,10 +387,10 @@ server <- function(input, output) {
         
     })
     
-
-    df_full <- reactive({
-        df5 <- as.tibble(df5())
-    })
+# 
+#     df_full <- reactive({
+#         df5 <- as_tibble(df5())
+#     })
 
     
     # 
