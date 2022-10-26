@@ -16,6 +16,7 @@ library(tidyverse)
 library(lubridate)
 library(DT)
 library(shinyjs)
+library(tsintermittent)
 
 
 # source
@@ -28,7 +29,29 @@ ui <- dashboardPage(skin = "red",
                     dashboardHeader(title = "Sales Generator", titleWidth = 320 # extend width because of the longer title
                     ),
                     # sidebare ---------
-                    dashboardSidebar(disable = TRUE),
+                    dashboardSidebar(disable = TRUE,
+                                     tagList(                       # Aligne the checkboxes left; code from https://stackoverflow.com/questions/29738975/how-to-align-a-group-of-checkboxgroupinput-in-r-shiny
+                                       tags$head(
+                                         tags$style(
+                                           HTML(                   # Change position of different elements 
+                                                        ".row {    
+                    margin-left: 15px;
+                    margin-right: 15px;
+                    }",
+                                                        
+                                                        ".shiny-input-container{ 
+                    margin-left: 0px;
+                    margin-right: 0px;
+                    }",
+                                             
+                                             
+                                             ".shiny-bound-output{ 
+                    margin-left: 0px;
+                    margin-right: 0px;
+                    }",
+                                           ))))
+                                     
+                                     ),
                     #* Sales Generator ----
                     
                   
@@ -60,13 +83,13 @@ ui <- dashboardPage(skin = "red",
             fluidRow(  
                 h3("Master Data"), 
                 #  EXT_PROD_ID
-                column(3, textInput(inputId = "EXT_PROD_ID", label = "EXT_PROD_ID", value = "", width = NULL, placeholder = NULL)),
+                column(2, textInput(inputId = "EXT_PROD_ID", label = "EXT_PROD_ID", value = "", width = NULL, placeholder = NULL)),
                     verbatimTextOutput("EXT_PROD_ID"),
                 #  EXT_LOC_ID
-                column(3, textInput(inputId = "EXT_LOC_ID", label = "EXT_LOC_ID", value = "", width = NULL, placeholder = NULL)),
+                column(2, textInput(inputId = "EXT_LOC_ID", label = "EXT_LOC_ID", value = "", width = NULL, placeholder = NULL)),
                 verbatimTextOutput("EXT_LOC_ID"),
                 #  LOC_TCD
-                column(3,textInput(inputId = "LOC_TCD", label = "LOC_TCD", value = "1040", width = NULL, placeholder = NULL)),
+                column(2,textInput(inputId = "LOC_TCD", label = "LOC_TCD", value = "1040", width = NULL, placeholder = NULL)),
                 verbatimTextOutput("LOC_TCD"),
                 #  SALES_UOM
                 column(2, textInput(inputId = "SALES_UOM", label = "SALES_UOM", value = "EA", width = NULL, placeholder = NULL)),
@@ -140,33 +163,50 @@ ui <- dashboardPage(skin = "red",
             ), 
             # 
             fluidRow(
-              tags$h4("DIFs (do not change the DIF Name"),
-                 numericInput("n_DIF", "Number of DIFs", 4),
+              tags$h4("DIFs (do not change the DIF Name)"),
+                 numericInput(inputId = "n_DIF",label = "Number of DIFs", 2),
                  # place to hold dynamic inputs
                  column(2, uiOutput("DIF_NAME")),
                  column(2, uiOutput("DIF_START")),
                  column(2, uiOutput("DIF_END")),
                  column(2, uiOutput("DIF_WEIGHT")),
-                 column(2, uiOutput("DIF_PRICE_R")), 
-                  column(2, uiOutput("DIF_OFR_ID"))
                 
-              
-
-              
-                 
             ),
+           
+           
+           fluidRow(
+             tags$h4("Offers (do not change the Offer Name)"),
+             numericInput(inputId = "n_OFR", label = "Number of Offers", value = 2),
+           # place to hold dynamic inputs
+           column(2, uiOutput("OFR_NAME")),
+           column(2, uiOutput("OFR_START")),
+           column(2, uiOutput("OFR_END")),
+           column(2, uiOutput("OFR_SALES")),
+           column(2, uiOutput("OFR_PRICE")), 
+           column(2, uiOutput("OFR_OFR_ID"))
+           ),
+           
+           
+           
             # 
             
             fluidRow(
                 tags$h4("Sales Data"),
-
-                column(3, numericInput(inputId="lambda", label = 'Expected average sales value',
-                                       min = 1, value=5))),
+                
+                
+                radioButtons("sales_dist", "Sales type:",
+                             c("Normal" = "Normal",
+                               "Intermittent" = "Intermittent")),
+                
+                column(3, uiOutput("sales_selection"))),
+# 
+#                 column(3, numericInput(inputId="lambda", label = 'Expected average sales value',
+#                                        min = 1, value=5)),
             
-           
+        fluidRow(
             actionButton("generate", "Generate Sales data", style="color: #fff; background-color: #d73925; border-color: #c34113;
                                 border-radius: 10px; 
-                             border-width: 2px"),
+                             border-width: 2px")),
 
             fluidRow(
                 # br(),
@@ -245,10 +285,10 @@ server <- function(input, output, session) {
              updateNumericInput(session, "holiday_Tag.der.Deutschen.Einheit",  value = if_else(!is.null(df_w$tde_w), df_w$tde_w, 1), min = 1)
              updateNumericInput(session, "holiday_Zweiter.Weihnachtstag",  value = if_else(!is.null(df_w$zweiter_wt), df_w$zweiter_wt, 1), min = 1)
 
-
+             updateNumericInput(session, "n_OFR",  value = if_else(!is.null(df_w$n_ofr), df_w$n_ofr, 1), min = 0)
              })
      
-     # dynamic DIF input
+     # dynamic DIF input ----
      observeEvent(input$n_DIF, {
        
     
@@ -290,20 +330,69 @@ server <- function(input, output, session) {
        })
        
        
-       output$DIF_PRICE_R = renderUI({
-         input_list <- lapply(1:input$n_DIF, function(i) {
+       
+     })
+     
+     
+     # dynamic OFR input ----
+     
+     
+     
+     observeEvent(input$n_OFR, {
+       
+       
+       
+       output$OFR_START = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
            # for each dynamically generated input, give a different name
-           DIF_Price_r <- paste("DIF_price_r", i, sep = "_")
-           numericInput(DIF_Price_r, "DIF Price Reduction", 0)
+           OFR_Start <- paste("OFR_start", i, sep = "_")
+           dateInput(OFR_Start, "Start of Offer:", value = Sys.Date()-729, format = "dd/mm/yyyy")
          })
          do.call(tagList, input_list)
        })
        
-       output$DIF_OFR_ID = renderUI({
-         input_list <- lapply(1:input$n_DIF, function(i) {
+       output$OFR_END = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
            # for each dynamically generated input, give a different name
-           DIF_Ofr_Id <- paste("DIF_ofr_id", i, sep = "_")
-           numericInput(DIF_Ofr_Id, "DIF ofr id", value = '')
+           OFR_End <- paste("OFR_end", i, sep = "_")
+           dateInput(OFR_End, "End of Offer:", value = Sys.Date(), format = "dd/mm/yyyy")
+         })
+         do.call(tagList, input_list)
+       })
+       
+       output$OFR_NAME = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Name <- paste("OFR_name", i, sep = "_")
+           textInput(OFR_Name, "Offer Name", value = paste("OFR", i, sep = "_"))
+         })
+         do.call(tagList, input_list)
+       })
+       
+       output$OFR_SALES = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Sales <- paste("OFR_sales", i, sep = "_")
+           numericInput(OFR_Sales, "Expected Offer Sales", 0)
+         })
+         do.call(tagList, input_list)
+       })
+       
+       
+       output$OFR_PRICE = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Price <- paste("OFR_price", i, sep = "_")
+           numericInput(OFR_Price, "OFR Price Reduction (in %)", 0)
+         })
+         do.call(tagList, input_list)
+       })
+       
+       output$OFR_OFR_ID = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Ofr_Id <- paste("OFR_ofr_id", i, sep = "_")
+           textInput(OFR_Ofr_Id, "Offer id", value = '')
          })
          do.call(tagList, input_list)
        })
@@ -312,23 +401,95 @@ server <- function(input, output, session) {
      })
      
      
-    # df_dif <- reactive({
-    #   
-    #   
-    # 
-    #     
-    #     
-    #     
-    #     
-    #   })
-    #   
- 
+     observeEvent(input$target_upload, {
+       
+       
+       if(!is.null(df_products_upload()))
+         df_w <- df_products_upload() 
+       
+       
+       
+       output$OFR_START = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Start <- paste("OFR_start", i, sep = "_")
+           dateInput(OFR_Start, "Start of Offer:", value = Sys.Date()-729, format = "dd/mm/yyyy")
+         })
+         do.call(tagList, input_list)
+       })
+       
+       output$OFR_END = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_End <- paste("OFR_end", i, sep = "_")
+           dateInput(OFR_End, "End of Offer:", value = Sys.Date(), format = "dd/mm/yyyy")
+         })
+         do.call(tagList, input_list)
+       })
+       
+       output$OFR_NAME = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Name <- paste("OFR_name", i, sep = "_")
+           textInput(OFR_Name, "Offer Name", value = paste("OFR", i, sep = "_"))
+         })
+         do.call(tagList, input_list)
+       })
+       
+       output$OFR_SALES = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Sales <- paste("OFR_sales", i, sep = "_")
+           numericInput(OFR_Sales, "Expected Offer Sales", 0)
+         })
+         do.call(tagList, input_list)
+       })
+       
+       
+       output$OFR_PRICE = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Price <- paste("OFR_price", i, sep = "_")
+           numericInput(OFR_Price, "OFR Price Reduction (in %)", 0)
+         })
+         do.call(tagList, input_list)
+       })
+       
+       output$OFR_OFR_ID = renderUI({
+         input_list <- lapply(1:input$n_OFR, function(i) {
+           # for each dynamically generated input, give a different name
+           OFR_Ofr_Id <- paste("OFR_ofr_id", i, sep = "_")
+           textInput(OFR_Ofr_Id, "Offer id", value = '')
+         })
+         do.call(tagList, input_list)
+       })
+       
+       
+     })
      
+     
+     
+     # dynamic sales input ----
+     observeEvent(input$sales_dist, {
+       
+       
+       
+       output$sales_selection = renderUI({
+         switch(input$sales_dist,
+                Normal =  numericInput(inputId="lambda", label = 'Expected average sales value', min = 1, value=5),
+                Intermittent = list(
+                  numericInput(inputId="intervall", label = "Average intermittent demand interval", min = 1, value=5), 
+                  numericInput(inputId="mean_demand", label = 'Average Mean demand of non-zero demands (must be greater than 1)', min = 1.1, value=5)))
+  
+       })
+       
+       
+     })
 
 
 
 
-    # Weights
+    # Create dataset and Weights
     
     observe({print(names(input))
         
@@ -337,6 +498,8 @@ server <- function(input, output, session) {
     
     df_full <- eventReactive(input$generate,{
       
+      
+    # DIF dataset  ----
       df_DIF <-  data.frame(
         
         DIF_name =  paste(lapply(1:input$n_DIF, function(i) {
@@ -360,25 +523,26 @@ server <- function(input, output, session) {
         
         DIF_weight =  paste(lapply(1:input$n_DIF, function(i) {
           inputName <- paste("DIF_weight", i, sep = "_")
-          input[[inputName]]})),
-        
-        DIF_price_r =  paste(lapply(1:input$n_DIF, function(i) {
-          inputName <- paste("DIF_price_r", i, sep = "_")
-          input[[inputName]]})),
-        
-        
-        DIF_ofr_id =  paste(lapply(1:input$n_DIF, function(i) {
-          inputName <- paste("DIF_ofr_id", i, sep = "_")
           input[[inputName]]}))
+        
+        # DIF_price_r =  paste(lapply(1:input$n_DIF, function(i) {
+        #   inputName <- paste("DIF_price_r", i, sep = "_")
+        #   input[[inputName]]})),
+        # 
+        # 
+        # DIF_ofr_id =  paste(lapply(1:input$n_DIF, function(i) {
+        #   inputName <- paste("DIF_ofr_id", i, sep = "_")
+        #   input[[inputName]]}))
       )
       
       df_DIF <- df_DIF %>% 
         as_tibble() %>% mutate(DIF_start = ymd(DIF_start),
                                DIF_end = ymd(DIF_end),
-                               DIF_weight = as.double(DIF_weight),
-                               DIF_price = as.double(DIF_price_r))
+                               DIF_weight = as.double(DIF_weight))
+                               # DIF_price = as.double(DIF_price_r))
       
       
+      ### DIF weights ----
       dates <- c(input$sales_to, input$sales_from)
       
       
@@ -387,13 +551,12 @@ server <- function(input, output, session) {
       
       df_d <- data.frame(obs_days) %>% as_tibble()
       
-      test <- data.frame()
+      dif <- data.frame()
       listofdfs <- list()
       
       for(i in 1:nrow(df_DIF)) {
-        test <- df_d %>%
+        dif <- df_d %>%
           mutate(DIF = if_else(df_DIF$DIF_start[i] <= df_d$obs_days & df_DIF$DIF_end[i] >= df_d$obs_days, 1, 0) ) %>%
-          # mutate(DIF = if_else(DIF == 1, log(DIF*df_DIF$DIF_weight[i]), NA_real_)) %>%
           mutate(DIF = case_when(
                                 DIF == 1 ~ log(DIF*df_DIF$DIF_weight[i]), 
                                 DIF == 0 ~ NA_real_,
@@ -401,16 +564,18 @@ server <- function(input, output, session) {
                                 TRUE ~ DIF
             )) %>% 
           rename(!!paste("DIF", i, sep = "_") := "DIF")
-        listofdfs[[i]] <- test
+        listofdfs[[i]] <- dif
       }
       
       df_dif <- reduce(listofdfs, full_join, by = "obs_days")
       
       
+      
+      
+  
 
 
-
-
+ # input weights ----
         dates <- c(input$sales_to, input$sales_from)
 
 
@@ -508,38 +673,140 @@ server <- function(input, output, session) {
                     is.na(holiday_Zweiter.Weihnachtstag) & holiday == "Zweiter Weihnachtstag" ~ 0,
                     TRUE ~  sum)) 
 
+      # generate sales ----
             lambda <- input$lambda
+            
+            intervall <- input$intervall
+            mean_demand <- input$mean_demand
 
             df4 <- df3 %>%
                 select(obs_days, sum) %>%
-                mutate(sales = rpois(nrow(df3), lambda = lambda)) %>%
-                mutate(ss_sales = sales*sum) %>%
+                mutate(sales = 
+                         
+                         switch(input$sales_dist,
+                                Normal =  rpois(nrow(df3), lambda = lambda),
+                                Intermittent = simID(n=1, obs=nrow(df3), idi= intervall, cv2= 0.5, level=mean_demand))
+                         
+                         ) %>%
+                mutate(ss_sales = round(sales*sum), 0) %>%
+                mutate(ss_sales = 
+                         
+                         switch(input$sales_dist,
+                                Normal =  ss_sales,
+                                Intermittent = ss_sales$ts.1)
+                       
+                ) %>%
                 as_tibble
-
-
         
     })
     
+    observe({print(df_full())})
+    
+    
+    
+    # OFR dataset  ----
+  df_OFR <-   eventReactive(input$generate,{
+    
+    df_OFR <-  data.frame(
+      
+      OFR_name =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_name", i, sep = "_")
+        input[[inputName]]})),
+      
+      
+      OFR_start =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_start", i, sep = "_")
+        start <- input[[inputName]]
+        start <- format(start, "%Y-%m-%d")
+        return(start)
+      })),
+      
+      OFR_end =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_end", i, sep = "_")
+        end <- input[[inputName]]
+        end <- format(end, "%Y-%m-%d")
+        return(end)
+      })),
+      
+      OFR_sales =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_sales", i, sep = "_")
+        input[[inputName]]})),
+      
+      OFR_price =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_price", i, sep = "_")
+        input[[inputName]]})),
+      
+      
+      OFR_ofr_id =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_ofr_id", i, sep = "_")
+        input[[inputName]]}))
+    )
+    
+    df_OFR <- df_OFR %>%
+      as_tibble() %>% mutate(OFR_start = ymd(OFR_start),
+                             OFR_end = ymd(OFR_end),
+                             OFR_sales = as.double(OFR_sales),
+                             OFR_price = as.double(OFR_price))
+    
+
+    
+    ## OFR sales ----
+    
+    ofr <- data.frame()
+    listofdfs_ofr <- list()
+    
+    for(i in 1:nrow(df_OFR)) {
+      
+      obs_days <- as_date(ymd(df_OFR$OFR_start[i]):ymd(df_OFR$OFR_end[i]))
+      #
+      
+      ofr <- data.frame(obs_days) %>%
+        as_tibble()
+      
+      
+      
+      lambda <- df_OFR$OFR_sales[i]
+      
+      
+      
+      
+      ofr <- ofr %>%
+        mutate(OFR_ID = df_OFR$OFR_ofr_id[i] ) %>%
+        mutate(sales= rpois(nrow(ofr), lambda = lambda)) %>%
+        mutate(OFR_price = round(input$PRICE*(1-df_OFR$OFR_price[i]/100), 2))
+      listofdfs_ofr[[i]] <- ofr
+    }
+    
+    df_ofrs <- bind_rows(listofdfs_ofr)
+    
+    # 
+    df_ofrs <- df_ofrs %>% filter(sales > 0)
+
+
+    
+    })
 # 
     
     
   
-    observe({print(df_full())})
+    observe({print(df_OFR())})
     
 
 
 
-    
-
+     # 
+     # 
      output$sales_plot <- renderPlot(df_full() %>% ggplot() +
                                          geom_line(aes(obs_days, ss_sales)) +
+                                         geom_point(df_OFR(), mapping = aes(obs_days, sales), colour = "blue") +
                                          theme_bw())
-    
-    
-    
-    
+
+     #
+     #
+     #
       df_table <- reactive({
-          df_full() %>%
+        
+        df_s <-   df_full() %>%
           mutate(EXT_PROD_ID = input$EXT_PROD_ID,
                  EXT_LOC_ID = input$EXT_LOC_ID,
                  LOC_TCD = input$LOC_TCD,
@@ -561,17 +828,42 @@ server <- function(input, output, session) {
           select(c(EXT_LOC_ID, EXT_PROD_ID, LOC_TCD, GRANULARITY, OFR_ID, TIMESTAMP,
                    PRC_TCD, RETURNED_SALES, UNIT_SALES, SALES_UOM, LOC_CURRENCY, ZPROMO_FLAG, GROSS_SALES_AMNT, NET_SALES_AMNT,
                    CURRENCY_ISO, UOM_ISO, FUNCTION))
-    
+        
+        df_os <-     df_OFR() %>%
+          mutate(EXT_PROD_ID = input$EXT_PROD_ID,
+                 EXT_LOC_ID = input$EXT_LOC_ID,
+                 LOC_TCD = input$LOC_TCD,
+                 SALES_UOM = input$SALES_UOM,
+                 LOC_CURRENCY = input$LOC_CURRENCY,
+                 GRANULARITY = "1",
+                 TIMESTAMP = format(obs_days, "%Y%m%d%H%M%S"),
+                 PRC_TCD = "",
+                 RETURNED_SALES = "",
+                 UNIT_SALES = sales,
+                 ZPROMO_FLAG = "",
+                 FUNCTION = "",
+                 GROSS_SALES_AMNT = sales * OFR_price,
+                 NET_SALES_AMNT = sales * OFR_price,
+                 CURRENCY_ISO = input$LOC_CURRENCY,
+                 UOM_ISO = input$SALES_UOM
+          ) %>%
+          select(c(EXT_LOC_ID, EXT_PROD_ID, LOC_TCD, GRANULARITY, OFR_ID, TIMESTAMP,
+                   PRC_TCD, RETURNED_SALES, UNIT_SALES, SALES_UOM, LOC_CURRENCY, ZPROMO_FLAG, GROSS_SALES_AMNT, NET_SALES_AMNT,
+                   CURRENCY_ISO, UOM_ISO, FUNCTION))
+        
+      df <-   rbind(df_s, df_os)
+        
+
       })
 
-
-
+      observe({print(df_table())})
+     #
      output$downloadData <- downloadHandler(
          filename = function() {
              paste(input$EXT_PROD_ID, input$EXT_LOC_ID, ".csv", sep = "_")
          },
          content = function(file) {
-             write_csv2(df_table(), file)
+             write_csv(df_table(), file)
          })
 
 
