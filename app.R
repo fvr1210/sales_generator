@@ -11,7 +11,7 @@ library(shiny)
 library(shinydashboard)
 library(data.table)
 library(prophet)
-library(recipes)
+library(mltools)
 library(tidyverse)
 library(lubridate)
 library(DT)
@@ -21,8 +21,8 @@ library(tsintermittent)
 
 # source
 
-
 eval(parse("scripts/create_holiday.R", encoding="UTF-8"))
+eval(parse("scripts/closed_days.R", encoding="UTF-8"))
 
 # Define UI for application that draws a histogram
 ui <- dashboardPage(skin = "red",
@@ -92,7 +92,7 @@ ui <- dashboardPage(skin = "red",
                 column(2,textInput(inputId = "LOC_TCD", label = "LOC_TCD", value = "1040", width = NULL, placeholder = NULL)),
                 verbatimTextOutput("LOC_TCD"),
                 #  SALES_UOM
-                column(2, textInput(inputId = "SALES_UOM", label = "SALES_UOM", value = "EA", width = NULL, placeholder = NULL)),
+                column(2, textInput(inputId = "SALES_UOM", label = "SALES_UOM", value = "ST", width = NULL, placeholder = NULL)),
                 verbatimTextOutput("SALES_UOM"),
                 #  SALES_UOM
                 column(2, numericInput(inputId = "PRICE", label = "Price", value = "1.95")),
@@ -135,9 +135,15 @@ ui <- dashboardPage(skin = "red",
             fluidRow(    
                 tags$h4("Year"),
                 
-                column(3, numericInput(inputId="year_X2020", label = 'Weight 2020:', value=1)),
-                column(3, numericInput(inputId="year_X2021", label = 'Weight 2021:', value=1)),
-                column(3, numericInput(inputId="year_X2022", label = 'Weight 2022:', value=1))),
+                column(2, uiOutput("year")),
+                
+                column(3, numericInput(inputId="year_2020", label = 'Weight 2020:', value=1)),
+                column(3, numericInput(inputId="year_2021", label = 'Weight 2021:', value=1)),
+                column(3, numericInput(inputId="year_2022", label = 'Weight 2022:', value=1)),
+                column(3, numericInput(inputId="year_2023", label = 'Weight 2023:', value=1)),
+                ),
+          
+               
             
             fluidRow( 
                 tags$h4("Holiday"),
@@ -146,7 +152,7 @@ ui <- dashboardPage(skin = "red",
                                      value=1)),
                 column(3, numericInput(inputId="holiday_Erster.Mai", label = 'Weight Erster Mai:',
                                       value=1)),
-                column(3, numericInput(inputId="holiday_Erster.Weihnachtstag", label = 'Weight Weihnachtstag:',
+                column(3, numericInput(inputId="holiday_Erster.Weihnachtstag", label = 'Weight Erster Weihnachtstag:',
                                      value=1)),
                 column(3, numericInput(inputId="holiday_Karfreitag", label = 'Weight Karfreitag:',
                                      value=1)),
@@ -158,7 +164,7 @@ ui <- dashboardPage(skin = "red",
                                      value=1)),
                 column(3, numericInput(inputId="holiday_Tag.der.Deutschen.Einheit", label = 'Weight Tag der Deutschen Einheit:',
                                      value=1)),
-                column(3, numericInput(inputId="holiday_Zweiter.Weihnachtstag", label = 'Weight Weihnachtstag:',
+                column(3, numericInput(inputId="holiday_Zweiter.Weihnachtstag", label = 'Weight Zweiter Weihnachtstag:',
                                       value=1))
             ), 
             # 
@@ -270,23 +276,84 @@ server <- function(input, output, session) {
              updateNumericInput(session, "month_Oktober",  value = if_else(!is.null(df_w$Oktober_w), df_w$Oktober_w, 1), min = 1)
              updateNumericInput(session, "month_November",  value = if_else(!is.null(df_w$November_w), df_w$November_w, 1), min = 1)
              updateNumericInput(session, "month_Dezember",  value = if_else(!is.null(df_w$Dezember_w), df_w$Dezember_w, 1), min = 1)
+              
+             updateNumericInput(session, "year_2020",  value = if_else(!is.null(df_w$w2020), df_w$w2020, 1), min = 1)
+             updateNumericInput(session, "year_2021",  value = if_else(!is.null(df_w$w2021), df_w$w2021, 1), min = 1)
+             updateNumericInput(session, "year_2022",  value = if_else(!is.null(df_w$w2022), df_w$w2022, 1), min = 1)
 
-             updateNumericInput(session, "year_X2020",  value = if_else(!is.null(df_w$w2020), df_w$w2020, 1), min = 1)
-             updateNumericInput(session, "year_X2021",  value = if_else(!is.null(df_w$w2021), df_w$w2021, 1), min = 1)
-             updateNumericInput(session, "year_X2022",  value = if_else(!is.null(df_w$w2022), df_w$w2022, 1), min = 1)
-             
-             updateNumericInput(session, "holiday_Christi.Himmelfahrt",  value = if_else(!is.null(df_w$christi_w), df_w$christi_w, 1), min = 1)
-             updateNumericInput(session, "holiday_Erster.Mai",  value = if_else(!is.null(df_w$erstermai_w), df_w$erstermai_w, 1), min = 1)
-             updateNumericInput(session, "holiday_Erster.Weihnachtstag",  value = if_else(!is.null(df_w$erster_wt), df_w$erster_wt, 1), min = 1)
+             updateNumericInput(session, "holiday_Christi Himmelfahrt",  value = if_else(!is.null(df_w$christi_w), df_w$christi_w, 1), min = 1)
+             updateNumericInput(session, "holiday_Erster Mai",  value = if_else(!is.null(df_w$erstermai_w), df_w$erstermai_w, 1), min = 1)
+             updateNumericInput(session, "holiday_Erster Weihnachtstag",  value = if_else(!is.null(df_w$erster_wt), df_w$erster_wt, 1), min = 1)
              updateNumericInput(session, "holiday_Karfreitag",  value = if_else(!is.null(df_w$karfrei_w), df_w$karfrei_w, 1), min = 1)
              updateNumericInput(session, "holiday_Neujahr",  value = if_else(!is.null(df_w$nj_w), df_w$nj_w, 1), min = 1)
              updateNumericInput(session, "holiday_Ostermontag",  value = if_else(!is.null(df_w$osterm_w), df_w$osterm_w, 1), min = 1)
              updateNumericInput(session, "holiday_Pfingstmontag",  value = if_else(!is.null(df_w$pfingstm_w), df_w$pfingstm_w, 1), min = 1)
-             updateNumericInput(session, "holiday_Tag.der.Deutschen.Einheit",  value = if_else(!is.null(df_w$tde_w), df_w$tde_w, 1), min = 1)
-             updateNumericInput(session, "holiday_Zweiter.Weihnachtstag",  value = if_else(!is.null(df_w$zweiter_wt), df_w$zweiter_wt, 1), min = 1)
+             updateNumericInput(session, "holiday_Tag.der Deutschen.Einheit",  value = if_else(!is.null(df_w$tde_w), df_w$tde_w, 1), min = 1)
+             updateNumericInput(session, "holiday_Zweiter Weihnachtstag",  value = if_else(!is.null(df_w$zweiter_wt), df_w$zweiter_wt, 1), min = 1)
 
              updateNumericInput(session, "n_OFR",  value = if_else(!is.null(df_w$n_ofr), df_w$n_ofr, 1), min = 0)
              })
+     
+     
+     
+     # dynamic year input ----
+     # observe({
+     #   
+     #   dates <- c(input$sales_to, input$sales_from)
+     #   
+     #   
+     #   obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
+     #   #
+     #   
+     #   df_d <- data.frame(obs_days) %>% 
+     #           as_tibble() %>% 
+     #           mutate(year = year(obs_days)) %>% 
+     #           distinct(year) %>% 
+     #           arrange(year)
+     #   
+     #   
+     #   output$year = renderUI({
+     #     input_list <- lapply(df_d$year[1]:df_d$year[nrow(df_d)], function(i) {
+     #       # for each dynamically generated input, give a different name
+     #       Years <- paste("year_X", i, sep = "")
+     #       numericInput(Years, paste("Year ", i, sep = ""), 1)
+     #     })
+     #     do.call(tagList, input_list)
+     #   })
+     #     })
+     
+     
+     # df_year <- eventReactive(input$generate,{
+     #   
+     #   dates <- c(input$sales_to, input$sales_from)
+     #   
+     #   
+     #   obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
+     #   
+     #   df_d <- data.frame(obs_days) %>% 
+     #     as_tibble() %>% 
+     #     mutate(year = year(obs_days)) %>% 
+     #     distinct(year) %>% 
+     #     arrange(year)
+     #   
+     #   
+     #   
+     #   df_year <-  data.frame(
+     #     
+     #     year_weight =  paste(lapply(df_d$year[1]:df_d$year[nrow(df_d)], function(i) {
+     #       inputName <- paste("Weight Year", i, sep = " ")
+     #       input[[inputName]]}))
+     #   )
+     #   
+     #   
+     #   cbind(df_d, df_year)
+       
+           # 
+           # })
+       
+     # observe(print(df_year()))
+ 
+     
      
      # dynamic DIF input ----
      observeEvent(input$n_DIF, {
@@ -491,9 +558,7 @@ server <- function(input, output, session) {
 
     # Create dataset and Weights
     
-    observe({print(names(input))
-        
-    })
+    # observe({print(names(input))})
     
     
     df_full <- eventReactive(input$generate,{
@@ -525,14 +590,6 @@ server <- function(input, output, session) {
           inputName <- paste("DIF_weight", i, sep = "_")
           input[[inputName]]}))
         
-        # DIF_price_r =  paste(lapply(1:input$n_DIF, function(i) {
-        #   inputName <- paste("DIF_price_r", i, sep = "_")
-        #   input[[inputName]]})),
-        # 
-        # 
-        # DIF_ofr_id =  paste(lapply(1:input$n_DIF, function(i) {
-        #   inputName <- paste("DIF_ofr_id", i, sep = "_")
-        #   input[[inputName]]}))
       )
       
       df_DIF <- df_DIF %>% 
@@ -572,6 +629,10 @@ server <- function(input, output, session) {
       
       
       
+      
+      
+      
+      
   
 
 
@@ -591,18 +652,39 @@ server <- function(input, output, session) {
         df_dh <- left_join(df_d, holiday, by = c("obs_days" = "ds"))
 
 
-        df1 <- df_dh %>%
-            mutate(year = as.factor(year)) %>%
-            recipe( ~ .) %>%
-            step_dummy(wday, month, year, holiday, one_hot = T ) %>%
-            prep() %>%
-            bake(df_dh) %>%
-            replace(is.na(.), 0) %>%
-            select(where(~ any(. != 0)))
+        # df1 <- df_dh %>%
+        #     mutate(year = as.factor(year)) %>%
+        #     recipe( ~ .) %>%
+        #     step_dummy(wday, month, year, holiday, one_hot = T ) %>%
+        #     prep() %>%
+        #     bake(df_dh) %>%
+        #     replace(is.na(.), 0) %>%
+        #     select(where(~ any(. != 0)))
+        # df_3 <- df %>% 
+        #   as_tibble %>% 
+        #   mutate(wday = as.factor(wday), month = as.factor(month), year = as.factor(year))
+        # 
+        # df_3 <- one_hot(as.data.table(df_3))
+        # 
+        # df_3 <- df_3 %>% as_tibble %>%
+        #   replace(is.na(.), 0) %>%
+        #   select(where(~ any(. != 0)))
+        
+        df1 <- df_dh %>% 
+          as_tibble %>% 
+          mutate(wday = as.factor(wday), month = as.factor(month), year = as.factor(year))
+          
+        df1 <- one_hot(as.data.table(df1))
+        
+        df1 <- df1 %>% as_tibble %>% 
+          replace(is.na(.), 0) %>%
+          select(where(~ any(. != 0))) %>% 
+          rename_all(~str_replace_all(., "\\s+", "."))
 
 
-# 
-# 
+
+#
+#
     input_df <- NULL
     df_row <- NULL
 
@@ -642,66 +724,69 @@ server <- function(input, output, session) {
 
             #
 
-#
+            
 #
 #
 #
             df3 <- df_dh %>%
-                cbind(log_data) %>%
-                as_tibble() %>%
-                mutate(year = as.factor(year)) %>%
-                mutate_if(is.numeric, ~ replace(., is.infinite(.), NA)) %>%
-                left_join(df_dif) %>% 
-                mutate(sum_log = rowSums(select_if(., is.numeric), na.rm = TRUE)) %>%
-                mutate(sum = exp(sum_log)) %>%
-                mutate(sum = case_when(
-                    is.na(wday_Montag) & wday == "Montag" ~ 0,
-                    is.na(wday_Dienstag) & wday == "Dienstag" ~ 0,
-                    is.na(wday_Mittwoch) & wday == "Mittwoch" ~ 0,
-                    is.na(wday_Donnerstag) & wday == "Donnerstag" ~ 0,
-                    is.na(wday_Freitag) & wday == "Freitag" ~ 0,
-                    is.na(wday_Samstag) & wday == "Samstag" ~ 0,
-                    is.na(wday_Sonntag) & wday == "Sonntag" ~ 0,
-                    is.na(holiday_Christi.Himmelfahrt) & holiday == "Christi Himmelfahrt" ~ 0,
-                    is.na(holiday_Erster.Mai) & holiday == "Erster Mai" ~ 0,
-                    is.na(holiday_Erster.Weihnachtstag) & holiday == "Erster Weihnachtstag" ~ 0,
-                    is.na(holiday_Karfreitag) & holiday == "Karfreitag" ~ 0,
-                    is.na(holiday_Neujahr) & holiday == "Neujahr" ~ 0,
-                    is.na(holiday_Ostermontag) & holiday == "Ostermontag" ~ 0,
-                    is.na(holiday_Pfingstmontag) & holiday == "Pfingstmontag" ~ 0,
-                    is.na(holiday_Tag.der.Deutschen.Einheit) & holiday == "Tag der Deutschen Einheit" ~ 0,
-                    is.na(holiday_Zweiter.Weihnachtstag) & holiday == "Zweiter Weihnachtstag" ~ 0,
-                    TRUE ~  sum)) 
-
+              cbind(log_data) %>%
+              as_tibble() %>%
+              mutate(year = as.factor(year)) %>%
+              mutate_if(is.numeric, ~ replace(., is.infinite(.), NA)) %>%
+              left_join(df_dif) %>% 
+              mutate(sum_log = rowSums(select_if(., is.numeric), na.rm = TRUE)) %>%
+              mutate(sum = exp(sum_log)) %>% 
+              mutate(holiday = if_else(is.na(holiday), "", as.character(holiday))) %>% 
+              week_days_null("Montag") %>%
+              week_days_null("Dienstag") %>%  
+              week_days_null("Mittwoch") %>%  
+              week_days_null("Donnerstag") %>%  
+              week_days_null("Freitag") %>%  
+              week_days_null("Samstag") %>%  
+              week_days_null("Sonntag") %>%  
+              holidays_null("Christi Himmelfahrt") %>% 
+              holidays_null("Erster Mai") %>% 
+              holidays_null("Erster Weihnachtstag") %>% 
+              holidays_null("Karfreitag") %>% 
+              holidays_null("Neujahr") %>% 
+              holidays_null("Ostermontag") %>% 
+              holidays_null("Pfingstmontag") %>% 
+              holidays_null("Tag der Deutschen Einheit") %>% 
+              holidays_null("Zweiter Weihnachtstag") 
+            
+       
+         
+            
+# 
       # generate sales ----
             lambda <- input$lambda
-            
+
             intervall <- input$intervall
             mean_demand <- input$mean_demand
 
             df4 <- df3 %>%
                 select(obs_days, sum) %>%
-                mutate(sales = 
-                         
+                mutate(sales =
+
                          switch(input$sales_dist,
                                 Normal =  rpois(nrow(df3), lambda = lambda),
                                 Intermittent = simID(n=1, obs=nrow(df3), idi= intervall, cv2= 0.5, level=mean_demand))
-                         
+
                          ) %>%
                 mutate(ss_sales = round(sales*sum), 0) %>%
-                mutate(ss_sales = 
-                         
+                mutate(ss_sales =
+
                          switch(input$sales_dist,
                                 Normal =  ss_sales,
                                 Intermittent = ss_sales$ts.1)
-                       
+
                 ) %>%
                 as_tibble
         
     })
     
     observe({print(df_full())})
-    
+    # 
     
     
     # OFR dataset  ----
@@ -805,21 +890,21 @@ server <- function(input, output, session) {
      #
      #
       df_table <- reactive({
-        
+
         df_s <-   df_full() %>%
           mutate(EXT_PROD_ID = input$EXT_PROD_ID,
                  EXT_LOC_ID = input$EXT_LOC_ID,
                  LOC_TCD = input$LOC_TCD,
                  SALES_UOM = input$SALES_UOM,
                  LOC_CURRENCY = input$LOC_CURRENCY,
-                 GRANULARITY = "1",
+                 GRANULARITY = "D",
                  OFR_ID = "",
                  TIMESTAMP = format(obs_days, "%Y%m%d%H%M%S"),
                  PRC_TCD = "",
                  RETURNED_SALES = "",
                  UNIT_SALES = ss_sales,
                  ZPROMO_FLAG = "",
-                 FUNCTION = "",
+                 FUNCTION = "I",
                  GROSS_SALES_AMNT = ss_sales * input$PRICE,
                  NET_SALES_AMNT = ss_sales * input$PRICE,
                  CURRENCY_ISO = input$LOC_CURRENCY,
@@ -828,7 +913,7 @@ server <- function(input, output, session) {
           select(c(EXT_LOC_ID, EXT_PROD_ID, LOC_TCD, GRANULARITY, OFR_ID, TIMESTAMP,
                    PRC_TCD, RETURNED_SALES, UNIT_SALES, SALES_UOM, LOC_CURRENCY, ZPROMO_FLAG, GROSS_SALES_AMNT, NET_SALES_AMNT,
                    CURRENCY_ISO, UOM_ISO, FUNCTION))
-        
+
         df_os <-     df_OFR() %>%
           mutate(EXT_PROD_ID = input$EXT_PROD_ID,
                  EXT_LOC_ID = input$EXT_LOC_ID,
@@ -850,9 +935,9 @@ server <- function(input, output, session) {
           select(c(EXT_LOC_ID, EXT_PROD_ID, LOC_TCD, GRANULARITY, OFR_ID, TIMESTAMP,
                    PRC_TCD, RETURNED_SALES, UNIT_SALES, SALES_UOM, LOC_CURRENCY, ZPROMO_FLAG, GROSS_SALES_AMNT, NET_SALES_AMNT,
                    CURRENCY_ISO, UOM_ISO, FUNCTION))
-        
+
       df <-   rbind(df_s, df_os)
-        
+
 
       })
 
@@ -863,7 +948,7 @@ server <- function(input, output, session) {
              paste(input$EXT_PROD_ID, input$EXT_LOC_ID, ".csv", sep = "_")
          },
          content = function(file) {
-             write_csv(df_table(), file)
+             write_delim(df_table(), file, delim = ";")
          })
 
 
