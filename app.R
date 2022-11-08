@@ -137,6 +137,7 @@ ui <- dashboardPage(skin = "red",
                 
                 column(2, uiOutput("year")),
                 
+                column(3, numericInput(inputId="year_2019", label = 'Weight 2019:', value=1)),
                 column(3, numericInput(inputId="year_2020", label = 'Weight 2020:', value=1)),
                 column(3, numericInput(inputId="year_2021", label = 'Weight 2021:', value=1)),
                 column(3, numericInput(inputId="year_2022", label = 'Weight 2022:', value=1)),
@@ -276,10 +277,12 @@ server <- function(input, output, session) {
              updateNumericInput(session, "month_Oktober",  value = if_else(!is.null(df_w$Oktober_w), df_w$Oktober_w, 1), min = 1)
              updateNumericInput(session, "month_November",  value = if_else(!is.null(df_w$November_w), df_w$November_w, 1), min = 1)
              updateNumericInput(session, "month_Dezember",  value = if_else(!is.null(df_w$Dezember_w), df_w$Dezember_w, 1), min = 1)
-              
+             
+             updateNumericInput(session, "year_2019",  value = if_else(!is.null(df_w$w2019), df_w$w2019, 1), min = 1) 
              updateNumericInput(session, "year_2020",  value = if_else(!is.null(df_w$w2020), df_w$w2020, 1), min = 1)
              updateNumericInput(session, "year_2021",  value = if_else(!is.null(df_w$w2021), df_w$w2021, 1), min = 1)
              updateNumericInput(session, "year_2022",  value = if_else(!is.null(df_w$w2022), df_w$w2022, 1), min = 1)
+             updateNumericInput(session, "year_2023",  value = if_else(!is.null(df_w$w2023), df_w$w2023, 1), min = 1)
 
              updateNumericInput(session, "holiday_Christi Himmelfahrt",  value = if_else(!is.null(df_w$christi_w), df_w$christi_w, 1), min = 1)
              updateNumericInput(session, "holiday_Erster Mai",  value = if_else(!is.null(df_w$erstermai_w), df_w$erstermai_w, 1), min = 1)
@@ -703,6 +706,9 @@ server <- function(input, output, session) {
 
             df2 <- df1 %>% select(obs_days) %>%
                 cbind(.,weight_inputs)
+            
+            df1 <- as_tibble(df1)  %>%
+              mutate(across(where(is.integer), as.double))
 
             df2 <- as_tibble(df2)  %>%
                 mutate(across(where(is.character), as.double))
