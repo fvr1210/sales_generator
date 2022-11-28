@@ -152,29 +152,29 @@ ui <- dashboardPage(skin = "red",
                 tags$h4("Holiday"),
                 
                 column(3, numericInput(inputId="holiday_Christi.Himmelfahrt", label = 'Weight Himmelfahrt:',
-                                     value=1)),
+                                     value=0)),
                 column(3, numericInput(inputId="holiday_Erster.Mai", label = 'Weight Erster Mai:',
-                                      value=1)),
+                                      value=0)),
                 column(3, numericInput(inputId="holiday_Erster.Weihnachtstag", label = 'Weight Erster Weihnachtstag:',
-                                     value=1)),
+                                     value=0)),
                 column(3, numericInput(inputId="holiday_Karfreitag", label = 'Weight Karfreitag:',
-                                     value=1)),
+                                     value=0)),
                 column(3, numericInput(inputId="holiday_Neujahr", label = 'Weight Neujahr:',
-                                     value=1)),
+                                     value=0)),
                 column(3, numericInput(inputId="holiday_Ostermontag", label = 'Weight Ostermontag:',
-                                     value=1)),
+                                     value=0)),
                 column(3, numericInput(inputId="holiday_Pfingstmontag", label = 'Weight Pfingstmontag:',
-                                     value=1)),
+                                     value=0)),
                 column(3, numericInput(inputId="holiday_Tag.der.Deutschen.Einheit", label = 'Weight Tag der Deutschen Einheit:',
-                                     value=1)),
+                                     value=0)),
                 column(3, numericInput(inputId="holiday_Zweiter.Weihnachtstag", label = 'Weight Zweiter Weihnachtstag:',
-                                      value=1)),
+                                      value=0)),
                 column(3, numericInput(inputId="holiday_Fronleichnam", label = 'Weight Fronleichnam:',
-                                       value=1)),
+                                       value=0)),
                 column(3, numericInput(inputId="holiday_Ostern", label = 'Weight Ostern:',
-                                       value=1)),
+                                       value=0)),
                 column(3, numericInput(inputId="holiday_Allerheiligen", label = 'Weight Allerheiligen:',
-                                       value=1))
+                                       value=0))
             ), 
             # 
             fluidRow(
@@ -292,22 +292,19 @@ server <- function(input, output, session) {
              updateNumericInput(session, "year_2022",  value = if_else(!is.null(df_w$w2022), df_w$w2022, NULL), min = 1)
              updateNumericInput(session, "year_2023",  value = if_else(!is.null(df_w$w2023), df_w$w2023, NULL), min = 1)
 
-             updateNumericInput(session, "holiday_Christi.Himmelfahrt",  value = if_else(!is.null(df_w$christi_w), df_w$christi_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Erster.Mai",  value = if_else(!is.null(df_w$erstermai_w), df_w$erstermai_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Erster.Weihnachtstag",  value = if_else(!is.null(df_w$erster_w), df_w$erster_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Karfreitag",  value = if_else(!is.null(df_w$karfrei_w), df_w$karfrei_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Neujahr",  value = if_else(!is.null(df_w$nj_w), df_w$nj_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Ostermontag",  value = if_else(!is.null(df_w$osterm_w), df_w$osterm_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Pfingstmontag",  value = if_else(!is.null(df_w$pfingstm_w), df_w$pfingstm_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Tag.der.Deutschen.Einheit",  value = if_else(!is.null(df_w$tde_w), df_w$tde_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Zweiter.Weihnachtstag",  value = if_else(!is.null(df_w$zweiter_w), df_w$zweiter_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Ostern",  value = if_else(!is.null(df_w$ostern_w), df_w$ostern_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Fronleichnam",  value = if_else(!is.null(df_w$fron_w), df_w$fron_w, NULL), min = 1)
-             updateNumericInput(session, "holiday_Allerheiligen",  value = if_else(!is.null(df_w$aller_w), df_w$aller_w, NULL), min = 1)
+             updateNumericInput(session, "holiday_Christi.Himmelfahrt",  value = if_else(!is.null(df_w$christi_w), df_w$christi_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Erster.Mai",  value = if_else(!is.null(df_w$erstermai_w), df_w$erstermai_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Erster.Weihnachtstag",  value = if_else(!is.null(df_w$erster_w), df_w$erster_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Karfreitag",  value = if_else(!is.null(df_w$karfrei_w), df_w$karfrei_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Neujahr",  value = if_else(!is.null(df_w$nj_w), df_w$nj_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Ostermontag",  value = if_else(!is.null(df_w$osterm_w), df_w$osterm_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Pfingstmontag",  value = if_else(!is.null(df_w$pfingstm_w), df_w$pfingstm_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Tag.der.Deutschen.Einheit",  value = if_else(!is.null(df_w$tde_w), df_w$tde_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Zweiter.Weihnachtstag",  value = if_else(!is.null(df_w$zweiter_w), df_w$zweiter_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Ostern",  value = if_else(!is.null(df_w$ostern_w), df_w$ostern_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Fronleichnam",  value = if_else(!is.null(df_w$fron_w), df_w$fron_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Allerheiligen",  value = if_else(!is.null(df_w$aller_w), df_w$aller_w, NULL), min = 0)
             
-             
-             
-             
              
              
              updateNumericInput(session, "n_OFR",  value = if_else(!is.null(df_w$n_ofr), df_w$n_ofr, NULL), min = 0)
