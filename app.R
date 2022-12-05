@@ -137,13 +137,13 @@ ui <- dashboardPage(skin = "red",
             fluidRow(    
                 tags$h4("Year"),
                 
-                # column(2, uiOutput("year")),
+                column(3, uiOutput("year")),
                 
-                column(3, numericInput(inputId="year_2019", label = 'Weight 2019:', value=1)),
-                column(3, numericInput(inputId="year_2020", label = 'Weight 2020:', value=1)),
-                column(3, numericInput(inputId="year_2021", label = 'Weight 2021:', value=1)),
-                column(3, numericInput(inputId="year_2022", label = 'Weight 2022:', value=1)),
-                column(3, numericInput(inputId="year_2023", label = 'Weight 2023:', value=1)),
+                # column(3, numericInput(inputId="year_2019", label = 'Weight 2019:', value=1)),
+                # column(3, numericInput(inputId="year_2020", label = 'Weight 2020:', value=1)),
+                # column(3, numericInput(inputId="year_2021", label = 'Weight 2021:', value=1)),
+                # column(3, numericInput(inputId="year_2022", label = 'Weight 2022:', value=1)),
+                # column(3, numericInput(inputId="year_2023", label = 'Weight 2023:', value=1)),
                 ),
           
                
@@ -313,62 +313,40 @@ server <- function(input, output, session) {
      
      
      # dynamic year input ----
-     # observe({
-     #   
-     #   dates <- c(input$sales_to, input$sales_from)
-     #   
-     #   
-     #   obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
-     #   #
-     #   
-     #   df_d <- data.frame(obs_days) %>% 
-     #           as_tibble() %>% 
-     #           mutate(year = year(obs_days)) %>% 
-     #           distinct(year) %>% 
-     #           arrange(year)
-     #   
-     #   
-     #   output$year = renderUI({
-     #     input_list <- lapply(df_d$year[1]:df_d$year[nrow(df_d)], function(i) {
-     #       # for each dynamically generated input, give a different name
-     #       Years <- paste("year_X", i, sep = "")
-     #       numericInput(Years, paste("Year ", i, sep = ""), 1)
-     #     })
-     #     do.call(tagList, input_list)
-     #   })
-     #     })
+
      
-     
-     # df_year <- eventReactive(input$generate,{
-     #   
-     #   dates <- c(input$sales_to, input$sales_from)
-     #   
-     #   
-     #   obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
-     #   
-     #   df_d <- data.frame(obs_days) %>% 
-     #     as_tibble() %>% 
-     #     mutate(year = year(obs_days)) %>% 
-     #     distinct(year) %>% 
-     #     arrange(year)
-     #   
-     #   
-     #   
-     #   df_year <-  data.frame(
-     #     
-     #     year_weight =  paste(lapply(df_d$year[1]:df_d$year[nrow(df_d)], function(i) {
-     #       inputName <- paste("Weight Year", i, sep = " ")
-     #       input[[inputName]]}))
-     #   )
-     #   
-     #   
-     #   cbind(df_d, df_year)
-       
-           # 
-           # })
-       
-     # observe(print(df_year()))
+     observe({
+
+         dates <- c(input$sales_to, input$sales_from)
+
+
+         obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
+         #
+
+         df_d <- data.frame(obs_days) %>%
+                 mutate(year = year(obs_days)) %>%
+                 distinct(year) %>%
+                 arrange(year)
+         
+         start_year <- df_d[1,] 
+         end_year <- tail(df_d, 1)[1,]
+       # 
+       output$year = renderUI({
+
+         input_list <- lapply(start_year:end_year, function(i) {
+           # for each dynamically generated input, give a different name
+           Year <- paste("i.year", i, sep = "_")
+           numericInput(Year, paste("Weight Year", i), value = 1)
+         })
+         do.call(tagList, input_list)
+       })
+
+     })
+           
  
+
+     # observe({print(start_year))})
+     # 
      
      
      # dynamic DIF input ----
@@ -834,7 +812,7 @@ server <- function(input, output, session) {
         
     })
     
-    observe({print(df_full())})
+    # observe({print(df_full())})
     # 
     
     
@@ -922,9 +900,9 @@ server <- function(input, output, session) {
 # 
     
     
-  
-    observe({print(df_OFR())})
-    
+    # 
+    # observe({print(df_OFR())})
+    # 
 
 
 
@@ -990,7 +968,7 @@ server <- function(input, output, session) {
 
       })
 
-      observe({print(df_table())})
+      # observe({print(df_table())})
      #
      output$downloadData <- downloadHandler(
          filename = function() {
