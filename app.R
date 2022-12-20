@@ -932,8 +932,8 @@ server <- function(input, output, session) {
                  UNIT_SALES = ss_sales,
                  ZPROMO_FLAG = "",
                  FUNCTION = "I",
-                 GROSS_SALES_AMNT = ss_sales * input$PRICE,
-                 NET_SALES_AMNT = ss_sales * input$PRICE,
+                 GROSS_SALES_AMNT = round(ss_sales * input$PRICE, 2),
+                 NET_SALES_AMNT = round(ss_sales * input$PRICE, 2),
                  CURRENCY_ISO = input$LOC_CURRENCY,
                  UOM_ISO = input$SALES_UOM
           ) %>%
@@ -954,8 +954,8 @@ server <- function(input, output, session) {
                  UNIT_SALES = sales,
                  ZPROMO_FLAG = "",
                  FUNCTION = "I",
-                 GROSS_SALES_AMNT = sales * OFR_price,
-                 NET_SALES_AMNT = sales * OFR_price,
+                 GROSS_SALES_AMNT = round(sales * OFR_price, 2),
+                 NET_SALES_AMNT = round(sales * OFR_price, 2),
                  CURRENCY_ISO = input$LOC_CURRENCY,
                  UOM_ISO = input$SALES_UOM
           ) %>%
