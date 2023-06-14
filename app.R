@@ -151,30 +151,35 @@ ui <- dashboardPage(skin = "red",
             fluidRow( 
                 tags$h4("Holiday"),
                 
-                column(3, numericInput(inputId="holiday_Christi.Himmelfahrt", label = 'Weight Himmelfahrt:',
-                                     value=0)),
-                column(3, numericInput(inputId="holiday_Erster.Mai", label = 'Weight Erster Mai:',
-                                      value=0)),
-                column(3, numericInput(inputId="holiday_Erster.Weihnachtstag", label = 'Weight Erster Weihnachtstag:',
-                                     value=0)),
-                column(3, numericInput(inputId="holiday_Karfreitag", label = 'Weight Karfreitag:',
-                                     value=0)),
                 column(3, numericInput(inputId="holiday_Neujahr", label = 'Weight Neujahr:',
-                                     value=0)),
-                column(3, numericInput(inputId="holiday_Ostermontag", label = 'Weight Ostermontag:',
-                                     value=0)),
-                column(3, numericInput(inputId="holiday_Pfingstmontag", label = 'Weight Pfingstmontag:',
-                                     value=0)),
-                column(3, numericInput(inputId="holiday_Tag.der.Deutschen.Einheit", label = 'Weight Tag der Deutschen Einheit:',
-                                     value=0)),
-                column(3, numericInput(inputId="holiday_Zweiter.Weihnachtstag", label = 'Weight Zweiter Weihnachtstag:',
-                                      value=0)),
-                column(3, numericInput(inputId="holiday_Fronleichnam", label = 'Weight Fronleichnam:',
+                                       value=0)),
+                column(3, numericInput(inputId="holiday_Heilige.Drei.Konige", label = 'Weight Heilige Drei Konige:',
+                                       value=0)),
+                column(3, numericInput(inputId="holiday_Karfreitag", label = 'Weight Karfreitag:',
                                        value=0)),
                 column(3, numericInput(inputId="holiday_Ostern", label = 'Weight Ostern:',
                                        value=0)),
+                column(3, numericInput(inputId="holiday_Ostermontag", label = 'Weight Ostermontag:',
+                                       value=0)),
+                column(3, numericInput(inputId="holiday_Erster.Mai", label = 'Weight Erster Mai:',
+                                       value=0)),
+                column(3, numericInput(inputId="holiday_Christi.Himmelfahrt", label = 'Weight Himmelfahrt:',
+                                     value=0)),
+                column(3, numericInput(inputId="holiday_Pfingsten", label = 'Weight Pfingsten:',
+                                       value=0)),
+                column(3, numericInput(inputId="holiday_Pfingstmontag", label = 'Weight Pfingstmontag:',
+                                       value=0)),
+                column(3, numericInput(inputId="holiday_Fronleichnam", label = 'Weight Fronleichnam:',
+                                       value=0)),
+                column(3, numericInput(inputId="holiday_Tag.der.Deutschen.Einheit", label = 'Weight Tag der Deutschen Einheit:',
+                                       value=0)),
                 column(3, numericInput(inputId="holiday_Allerheiligen", label = 'Weight Allerheiligen:',
-                                       value=0))
+                                       value=0)),
+                column(3, numericInput(inputId="holiday_Erster.Weihnachtstag", label = 'Weight Erster Weihnachtstag:',
+                                     value=0)),
+                column(3, numericInput(inputId="holiday_Zweiter.Weihnachtstag", label = 'Weight Zweiter Weihnachtstag:',
+                                      value=0))
+
             ), 
             # 
             fluidRow(
@@ -231,6 +236,11 @@ ui <- dashboardPage(skin = "red",
                 plotOutput("sales_plot")
             ),
 
+            fluidRow(
+              tags$h4("For how many locations do you need the sales data (additional location name will be EXT_LOC_ID + 1, + 2 etc.)"),
+              numericInput(inputId = "n_LOC_ID", label = "Number of Locations", value = 1),
+            ),
+
             # Button
             downloadButton("downloadData", "Download"),
            
@@ -264,6 +274,8 @@ server <- function(input, output, session) {
      observeEvent(input$target_upload, {
          if(!is.null(df_products_upload()))
              df_w <- df_products_upload() 
+         
+             updateTextInput(session, "EXT_PROD_ID",  value = if_else(!is.null(df_w$PROD_ID_w), df_w$PROD_ID_w, ""))
 
              updateNumericInput(session, "wday_Monday",  value = if_else(!is.null(df_w$Monday_w), df_w$Monday_w, NULL), min = 1)
              updateNumericInput(session, "wday_Tuesday",  value = if_else(!is.null(df_w$Tuesday_w), df_w$Tuesday_w, NULL), min = 1)
@@ -304,9 +316,9 @@ server <- function(input, output, session) {
              updateNumericInput(session, "holiday_Ostern",  value = if_else(!is.null(df_w$ostern_w), df_w$ostern_w, NULL), min = 0)
              updateNumericInput(session, "holiday_Fronleichnam",  value = if_else(!is.null(df_w$fron_w), df_w$fron_w, NULL), min = 0)
              updateNumericInput(session, "holiday_Allerheiligen",  value = if_else(!is.null(df_w$aller_w), df_w$aller_w, NULL), min = 0)
-            
-             
-             
+             updateNumericInput(session, "holiday_Heilige.Drei.Konige",  value = if_else(!is.null(df_w$hdk_w), df_w$hdk_w, NULL), min = 0)
+             updateNumericInput(session, "holiday_Pfingsten",  value = if_else(!is.null(df_w$pfingsten_w), df_w$pfingsten_w, NULL), min = 0)
+
              updateNumericInput(session, "n_OFR",  value = if_else(!is.null(df_w$n_ofr), df_w$n_ofr, NULL), min = 0)
              })
      
@@ -317,29 +329,24 @@ server <- function(input, output, session) {
      
      observe({
 
-         dates <- c(input$sales_to, input$sales_from)
-
-
-         obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
-         #
-
-         df_d <- data.frame(obs_days) %>%
-                 mutate(year = year(obs_days)) %>%
-                 distinct(year) %>%
-                 arrange(year)
-         
-         start_year <- df_d[1,] 
-         end_year <- tail(df_d, 1)[1,]
+       
+       sales_from <- input$sales_from
+       sales_to <- input$sales_to
+       
+       selected_years <- seq(year(sales_from), year(sales_to))
        # 
        output$year = renderUI({
 
-         input_list <- lapply(start_year:end_year, function(i) {
+         input_list <- lapply(selected_years, function(i) {
            # for each dynamically generated input, give a different name
            Year <- paste("i.year", i, sep = "_")
            numericInput(Year, paste("Weight Year", i), value = 1)
          })
          do.call(tagList, input_list)
        })
+       
+       
+       
 
      })
            
@@ -668,7 +675,9 @@ server <- function(input, output, session) {
               "Zweiter Weihnachtstag",
               "Fronleichnam", 
               "Ostern",
-              "Allerheiligen"
+              "Allerheiligen",
+              "Heilige Drei Konige",
+              "Pfingsten"
           ))
 
         df_dh <- left_join(df_d, holiday, by = c("obs_days" = "ds")) 
@@ -780,7 +789,9 @@ server <- function(input, output, session) {
               holidays_null("Zweiter Weihnachtstag") %>% 
               holidays_null("Fronleichnam")  %>% 
               holidays_null("Ostern") %>% 
-              holidays_null("Allerheiligen")
+              holidays_null("Allerheiligen") %>% 
+              holidays_null("Heilige Drei Konige") %>% 
+              holidays_null("Pfingsten") 
        
          
             
@@ -965,14 +976,42 @@ server <- function(input, output, session) {
 
       df <-   rbind(df_s, df_os)
 
+      if (input$n_LOC_ID > 1) {
+        
+          LOC_ID <- as.numeric(input$EXT_LOC_ID)
+            
+            generate_locations <- function(start, end) {
+              sprintf("%04d", seq(start, end))
+            }
+            
+            # Number of locations needed
+            num_locations <- input$n_LOC_ID
+            
+            # Generate vector of locations
+            locations <- generate_locations(LOC_ID + 1, LOC_ID + num_locations)
+            
+            # Duplicate and update location for each location
+            duplicated_dfs <- purrr::map(locations, ~ mutate(df, EXT_LOC_ID = .x))
+            
+            # Merge all duplicated dataframes into one dataframe
+            merged_df <- dplyr::bind_rows(duplicated_dfs)
+            
 
+            df <- rbind(df, merged_df)
+          }
+       else {
+          # Return the original dataframe when n_LOC_ID is not greater than 1
+          df
+       }
       })
+        
+
 
       # observe({print(df_table())})
      #
      output$downloadData <- downloadHandler(
          filename = function() {
-             paste(input$EXT_PROD_ID, input$EXT_LOC_ID, ".csv", sep = "_")
+             paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID[1], "to", tail(df_table()$EXT_LOC_ID), ".csv", sep = "_")
          },
          content = function(file) {
              write_delim(df_table(), file, delim = ";")
