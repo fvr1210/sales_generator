@@ -1011,7 +1011,7 @@ server <- function(input, output, session) {
      #
      output$downloadData <- downloadHandler(
          filename = function() {
-             paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID[1], "to", tail(df_table()$EXT_LOC_ID), ".csv", sep = "_")
+           ifelse(input$n_LOC_ID > 1, paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID[1], "to", tail(df_table()$EXT_LOC_ID), ".csv", sep = "_"), paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID, ".csv", sep = "_"))
          },
          content = function(file) {
              write_delim(df_table(), file, delim = ";")
