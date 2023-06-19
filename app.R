@@ -237,9 +237,11 @@ ui <- dashboardPage(skin = "red",
             ),
 
             fluidRow(
-              tags$h4("For how many locations do you need the sales data (additional location name will be EXT_LOC_ID + 1, + 2 etc.)"),
-              numericInput(inputId = "n_LOC_ID", label = "Number of Locations", value = 1),
+              tags$h4("For how many additional locations do you need the sales data (additional location name will be EXT_LOC_ID + 1, + 2 etc.)"),
+              numericInput(inputId = "n_LOC_ID", label = "Number of Locations", value = 0),
             ),
+
+          radioButtons("ouputfile","Outputfile: ",choices = c("BI_SALES","POSDAT"), selected="BI_SALES",inline=TRUE),
 
             # Button
             downloadButton("downloadData", "Download"),
@@ -976,7 +978,7 @@ server <- function(input, output, session) {
 
       df <-   rbind(df_s, df_os)
 
-      if (input$n_LOC_ID > 1) {
+      if (input$n_LOC_ID > 0) {
         
           LOC_ID <- as.numeric(input$EXT_LOC_ID)
             
@@ -1009,16 +1011,100 @@ server <- function(input, output, session) {
 
       # observe({print(df_table())})
      #
+      
+      observe({
+        if (input$ouputfile == "BI_SALES") {
      output$downloadData <- downloadHandler(
          filename = function() {
-           ifelse(input$n_LOC_ID > 1, paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID[1], "to", tail(df_table()$EXT_LOC_ID), ".csv", sep = "_"), paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID, ".csv", sep = "_"))
+           ifelse(input$n_LOC_ID > 0, paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID[1], "to", tail(df_table()$EXT_LOC_ID), ".csv", sep = "_"), paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID, ".csv", sep = "_"))
          },
          content = function(file) {
              write_delim(df_table(), file, delim = ";")
          })
+        }
+        else {
+          # Return the original dataframe when n_LOC_ID is not greater than 1
+          transaction <- df_table() %>% 
+            mutate(RETAILSTOREID = EXT_LOC_ID, 
+                   date = as.Date(TIMESTAMP, format = "%Y%m%d"),
+                   BUSINESSDAYDATE =  format(date, "%Y%m%d"),
+                  # TRANSACTIONSEQUENCENUMBER = paste0(EXT_PROD_ID, EXT_LOC_ID, date, as.numeric(substr(OFR_ID, 1, 2))),
+                   TRANSACTIONSEQUENCENUMBER = paste(sample(c(letters, LETTERS, 0:9), 20, replace=TRUE), collapse=""),
+                   BEGINDATETIMESTAMP = TIMESTAMP,
+                   ENDDATETIMESTAMP = TIMESTAMP,
+                   TRANSACTIONCURRENCY = CURRENCY_ISO) %>% 
+            select(c("RETAILSTOREID", "BUSINESSDAYDATE", "TRANSACTIONSEQUENCENUMBER", "BEGINDATETIMESTAMP", "ENDDATETIMESTAMP", "TRANSACTIONCURRENCY"))
+          
+          retaillineitem <- df_table() %>% 
+            mutate(RETAILSTOREID = EXT_LOC_ID, 
+                   date = as.Date(TIMESTAMP, format = "%Y%m%d"),
+                   BUSINESSDAYDATE =  format(date, "%Y%m%d"),
+                   TRANSACTIONSEQUENCENUMBER = paste(sample(c(letters, LETTERS, 0:9), 20, replace=TRUE), collapse=""),
+                   RETAILSEQUENCENUMBER = paste(sample(c(letters, LETTERS, 0:9), 10, replace=TRUE), collapse=""),
+                   ITEMID = EXT_PROD_ID,
+                   RETAILQUANTITY = UNIT_SALES,
+                   SALESUNITOFMEASURE = SALES_UOM,
+                   SALESUNITOFMEASURE_ISO = SALES_UOM,
+                   SALESAMOUNT = GROSS_SALES_AMNT,
+                   NORMALSALESAMOUNT = NET_SALES_AMNT) %>% 
+            select(c("RETAILSTOREID", "BUSINESSDAYDATE", "TRANSACTIONSEQUENCENUMBER", "RETAILSEQUENCENUMBER", "ITEMID", "SALESUNITOFMEASURE", "SALESUNITOFMEASURE_ISO", "SALESUNITOFMEASURE_ISO", "SALESAMOUNT", "NORMALSALESAMOUNT"))
+          
+          timestamp <- df_table() %>% 
+            mutate(RETAILSTOREID = EXT_LOC_ID, 
+                   date = as.Date(TIMESTAMP, format = "%Y%m%d"),
+                   BUSINESSDAYDATE =  format(date, "%Y%m%d"),
+                   TRANSACTIONSEQUENCENUMBER = paste0(EXT_PROD_ID, EXT_LOC_ID, date, as.numeric(substr(OFR_ID, 1, 2))),
+                   TAXAMOUNT = NET_SALES_AMNT*0.2) %>% 
+            select(c("RETAILSTOREID", "BUSINESSDAYDATE", "TRANSACTIONSEQUENCENUMBER", "TAXAMOUNT"))
+          
+          tender <- df_table() %>% 
+            mutate(RETAILSTOREID = EXT_LOC_ID, 
+                   date = as.Date(TIMESTAMP, format = "%Y%m%d"),
+                   BUSINESSDAYDATE =  format(date, "%Y%m%d"),
+                   TRANSACTIONSEQUENCENUMBER = paste0(EXT_PROD_ID, EXT_LOC_ID, date, as.numeric(substr(OFR_ID, 1, 2))),
+                   TENDERAMOUNT = NET_SALES_AMNT,
+                   TENDERCURRENCY = LOC_CURRENCY,
+                   TENDERCURRENCY_ISO = LOC_CURRENCY
+                   ) %>% 
+            select(c("RETAILSTOREID", "BUSINESSDAYDATE", "TRANSACTIONSEQUENCENUMBER", "TENDERAMOUNT", "TENDERCURRENCY", "TENDERCURRENCY_ISO"))
+          
+          
+          trans_name <- paste("transaction", input$EXT_PROD_ID, input$EXT_LOC_ID, ".csv", sep = "_")
+          rli_name <-  paste("retaillineitem", input$EXT_PROD_ID, input$EXT_LOC_ID, ".csv", sep = "_")
+          timestamp_name <-  paste("timestamp", input$EXT_PROD_ID, input$EXT_LOC_ID, ".csv", sep = "_")
+          tender_name <-  paste("tender", input$EXT_PROD_ID, input$EXT_LOC_ID, ".csv", sep = "_")
+          
+          createCSVFiles <- function() {
+            
+            # Write data to CSV files
+            write_delim(transaction, trans_name, delim = ";")
+            write_delim(retaillineitem, rli_name, delim = ";")
+            write_delim(timestamp, timestamp_name, delim = ";")
+            write_delim(tender, tender_name, delim = ";")
+          }
+          
+          output$downloadData <- downloadHandler(
+            filename = paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID, ".zip", sep = "_"),
+            content = function(file) {
+              # Create CSV files
+              createCSVFiles()
+              
+              # Create a zip file containing the CSV files
+              zip(file, c(trans_name, rli_name, timestamp_name, tender_name))
+              
+              # Delete the individual CSV files
+              file.remove(c(trans_name, rli_name, timestamp_name, tender_name))
+            }
+          )}
+       })
 
-
-    
+      # output$downloadData <- downloadHandler(
+      #       filename = function() {
+      #         ifelse(input$n_LOC_ID > 1, paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID[1], "to", tail(df_table()$EXT_LOC_ID), ".csv", sep = "_"), paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID, ".csv", sep = "_"))
+      #       },
+      #       content = function(file) {
+      #           write_delim(df_table(), file, delim = ";")
+      #       })
     
 }
 
