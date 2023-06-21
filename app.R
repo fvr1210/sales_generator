@@ -236,13 +236,18 @@ ui <- dashboardPage(skin = "red",
                 plotOutput("sales_plot")
             ),
 
-            fluidRow(
-              tags$h4("For how many additional locations do you need the sales data (additional location name will be EXT_LOC_ID + 1, + 2 etc.)"),
-              numericInput(inputId = "n_LOC_ID", label = "Number of Locations", value = 0),
-            ),
+            
 
           radioButtons("ouputfile","Outputfile: ",choices = c("BI_SALES","POSDAT"), selected="BI_SALES",inline=TRUE),
 
+
+           # fluidRow(
+           #    tags$h4("For how many additional locations do you need the sales data (additional location name will be EXT_LOC_ID + 1, + 2 etc.)"),
+           #    numericInput(inputId = "n_LOC_ID", label = "Number of Locations", value = 0),
+           #  ),
+
+
+          uiOutput("dynamicRow"),
             # Button
             downloadButton("downloadData", "Download"),
            
@@ -262,6 +267,23 @@ ui <- dashboardPage(skin = "red",
 server <- function(input, output, session) {
     
     
+    output$dynamicRow <- renderUI({
+      if (input$ouputfile == "BI_SALES") {
+        fluidRow(
+          tags$h4("For how many additional locations do you need the sales data (additional location name will be EXT_LOC_ID + 1, + 2 etc.)"),
+          numericInput(inputId = "n_LOC_ID", label = "Number of Locations", value = 0),
+        )
+      # } else if (input$selection == "Option 2") {
+      #   fluidRow(
+      #     column(12, h4("Option 2 selected")),
+      #     column(12, p("Some content for Option 2"))
+      #   )
+      }
+    })
+  
+  
+  
+  
     df_products_upload <- reactive({
         inFile <- input$target_upload
         if (is.null(inFile))
@@ -1028,8 +1050,7 @@ server <- function(input, output, session) {
             mutate(RETAILSTOREID = EXT_LOC_ID, 
                    date = as.Date(TIMESTAMP, format = "%Y%m%d"),
                    BUSINESSDAYDATE =  format(date, "%Y%m%d"),
-                  # TRANSACTIONSEQUENCENUMBER = paste0(EXT_PROD_ID, EXT_LOC_ID, date, as.numeric(substr(OFR_ID, 1, 2))),
-                   TRANSACTIONSEQUENCENUMBER = paste(sample(c(letters, LETTERS, 0:9), 20, replace=TRUE), collapse=""),
+                   TRANSACTIONSEQUENCENUMBER = format(Sys.time(), "%Y%m%d%H%M%S"),
                    BEGINDATETIMESTAMP = TIMESTAMP,
                    ENDDATETIMESTAMP = TIMESTAMP,
                    TRANSACTIONCURRENCY = CURRENCY_ISO) %>% 
@@ -1039,21 +1060,21 @@ server <- function(input, output, session) {
             mutate(RETAILSTOREID = EXT_LOC_ID, 
                    date = as.Date(TIMESTAMP, format = "%Y%m%d"),
                    BUSINESSDAYDATE =  format(date, "%Y%m%d"),
-                   TRANSACTIONSEQUENCENUMBER = paste(sample(c(letters, LETTERS, 0:9), 20, replace=TRUE), collapse=""),
-                   RETAILSEQUENCENUMBER = paste(sample(c(letters, LETTERS, 0:9), 10, replace=TRUE), collapse=""),
+                   TRANSACTIONSEQUENCENUMBER = transaction$TRANSACTIONSEQUENCENUMBER,
+                   # RETAILSEQUENCENUMBER = paste(sample(c(LETTERS, 0:9), 10, replace=TRUE), collapse=""),
                    ITEMID = EXT_PROD_ID,
                    RETAILQUANTITY = UNIT_SALES,
                    SALESUNITOFMEASURE = SALES_UOM,
                    SALESUNITOFMEASURE_ISO = SALES_UOM,
                    SALESAMOUNT = GROSS_SALES_AMNT,
                    NORMALSALESAMOUNT = NET_SALES_AMNT) %>% 
-            select(c("RETAILSTOREID", "BUSINESSDAYDATE", "TRANSACTIONSEQUENCENUMBER", "RETAILSEQUENCENUMBER", "ITEMID", "SALESUNITOFMEASURE", "SALESUNITOFMEASURE_ISO", "SALESUNITOFMEASURE_ISO", "SALESAMOUNT", "NORMALSALESAMOUNT"))
+            select(c("RETAILSTOREID", "BUSINESSDAYDATE", "TRANSACTIONSEQUENCENUMBER", "ITEMID", "SALESUNITOFMEASURE", "SALESUNITOFMEASURE_ISO", "SALESUNITOFMEASURE_ISO", "SALESAMOUNT", "NORMALSALESAMOUNT"))
           
           timestamp <- df_table() %>% 
             mutate(RETAILSTOREID = EXT_LOC_ID, 
                    date = as.Date(TIMESTAMP, format = "%Y%m%d"),
                    BUSINESSDAYDATE =  format(date, "%Y%m%d"),
-                   TRANSACTIONSEQUENCENUMBER = paste0(EXT_PROD_ID, EXT_LOC_ID, date, as.numeric(substr(OFR_ID, 1, 2))),
+                   TRANSACTIONSEQUENCENUMBER = transaction$TRANSACTIONSEQUENCENUMBER,
                    TAXAMOUNT = NET_SALES_AMNT*0.2) %>% 
             select(c("RETAILSTOREID", "BUSINESSDAYDATE", "TRANSACTIONSEQUENCENUMBER", "TAXAMOUNT"))
           
@@ -1061,7 +1082,7 @@ server <- function(input, output, session) {
             mutate(RETAILSTOREID = EXT_LOC_ID, 
                    date = as.Date(TIMESTAMP, format = "%Y%m%d"),
                    BUSINESSDAYDATE =  format(date, "%Y%m%d"),
-                   TRANSACTIONSEQUENCENUMBER = paste0(EXT_PROD_ID, EXT_LOC_ID, date, as.numeric(substr(OFR_ID, 1, 2))),
+                   TRANSACTIONSEQUENCENUMBER = transaction$TRANSACTIONSEQUENCENUMBER,
                    TENDERAMOUNT = NET_SALES_AMNT,
                    TENDERCURRENCY = LOC_CURRENCY,
                    TENDERCURRENCY_ISO = LOC_CURRENCY
