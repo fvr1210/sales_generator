@@ -233,7 +233,9 @@ ui <- dashboardPage(skin = "red",
                 # dataTableOutput("wei_stand_dis_table"),
                 br(),
                 # dataTableOutput("sales_table"),
-                plotOutput("sales_plot")
+                plotOutput("sales_plot_day"),
+                plotOutput("sales_plot_week")
+   
             ),
 
             
@@ -843,7 +845,7 @@ server <- function(input, output, session) {
                                 Intermittent = ss_sales$ts.1)
 
                 ) %>%
-                as_tibble
+                as_tibble 
         
     })
     
@@ -908,7 +910,44 @@ server <- function(input, output, session) {
       #
       
       ofr <- data.frame(obs_days) %>%
-        as_tibble()
+        as_tibble() %>%
+        mutate(wday = weekdays(obs_days)) %>%
+        mutate(month = months(obs_days)) %>%
+        mutate(year = year(obs_days))
+      
+      holiday_de <- make_holidays_df(c(ofr$year), "DE")
+      holiday_ch <- make_holidays_df(c(ofr$year), "CH")
+      holiday_at <- make_holidays_df(c(ofr$year), "AT")
+      
+      
+      holiday <- holiday_de %>% 
+        full_join(., holiday_at, by = c("ds" = "ds")) %>% 
+        full_join(., holiday_ch, by = c("ds" = "ds")) %>% 
+        rename("holiday.z" = "holiday") %>% 
+        mutate(holiday = case_when(
+          is.na(holiday.x) & !is.na(holiday.y) ~ holiday.y, 
+          is.na(holiday.x) & is.na(holiday.y) ~ holiday.z,
+          TRUE ~ holiday.x
+        )) %>% 
+        select(ds, holiday) %>% 
+        filter(holiday %in% c(
+          "Christi Himmelfahrt",
+          "Erster Mai",
+          "Erster Weihnachtstag",
+          "Karfreitag",
+          "Neujahr",
+          "Ostermontag",
+          "Pfingstmontag",
+          "Tag der Deutschen Einheit",
+          "Zweiter Weihnachtstag",
+          "Fronleichnam", 
+          "Ostern",
+          "Allerheiligen",
+          "Heilige Drei Konige",
+          "Pfingsten"
+        ))
+      
+      ofr <- left_join(ofr, holiday, by = c("obs_days" = "ds")) 
       
       
       
@@ -919,22 +958,49 @@ server <- function(input, output, session) {
       
       ofr <- ofr %>%
         mutate(OFR_ID = df_OFR$OFR_ofr_id[i] ) %>%
-        mutate(sales= rpois(nrow(ofr), lambda = lambda)) %>%
-        mutate(OFR_price = round(input$PRICE*(1-df_OFR$OFR_price[i]/100), 2))
+        mutate(sum = rpois(nrow(ofr), lambda = lambda)) %>%
+        mutate(OFR_price = round(input$PRICE*(1-df_OFR$OFR_price[i]/100), 2)) 
+      
       listofdfs_ofr[[i]] <- ofr
     }
     
-    df_ofrs <- bind_rows(listofdfs_ofr)
+    input_df <- NULL
+    df_row <- NULL
+    
+    for(i in 1:length(names(input))){
+      df_row <- as.data.frame(cbind(names(input)[i], input[[names(input)[i]]]))
+      input_df <- as_tibble(dplyr::bind_rows(input_df, df_row)) %>%
+        select(c(V1, V2))
+    }
+    names(input_df) <- c("input_id", "input_val")
+    input_df
+    
+    weight_inputs <- input_df %>%
+      filter(grepl('wday_', names(input)) | grepl('holiday_', names(input)) ) %>%
+      pivot_wider(names_from=c(input_id), values_from=input_val) 
+    
+    
+    
+    df_ofrs <- bind_rows(listofdfs_ofr) %>% 
+      cbind(., weight_inputs) %>% 
+      mutate(across(where(is.integer), as.double)) %>% 
+      mutate(holiday = if_else(is.na(holiday), "", as.character(holiday))) %>% 
+      week_days_null_ofr() %>% 
+      holidays_null_ofr() %>% 
+      mutate(sales = sum)
+    
     
     # 
     df_ofrs <- df_ofrs %>% filter(sales > 0)
 
-
     
     })
 # 
+   # df_input <- reactive({
+   #   
+   # })
     
-    
+   # observe({print(df_input())})
     # 
     # observe({print(df_OFR())})
     # 
@@ -943,13 +1009,45 @@ server <- function(input, output, session) {
 
      # 
      # 
-     output$sales_plot <- renderPlot(df_full() %>% ggplot() +
+     output$sales_plot_day <- renderPlot(df_full() %>% ggplot() +
                                          geom_line(aes(obs_days, ss_sales)) +
                                          geom_point(df_OFR(), mapping = aes(obs_days, sales), colour = "blue") +
                                          theme_bw())
-
+     
+     
+     
+     
+     df_week_sales <- reactive({
+       
+      df_week_sales <- df_full() %>% 
+         mutate(year_week = as.character(paste0(year(obs_days), week(obs_days))),
+                year_week = ifelse(nchar(year_week) == 6, year_week, 
+                                   paste0(substring(year_week, first = 0, last= 4), 0, substring(year_week, 5)))) %>% 
+         group_by(year_week) %>% 
+         summarise(week_sales = sum(ss_sales))
+     
+     })
+     
+     df_week_OFRS <- reactive({
+     
+     df_week_OFRS <- df_OFR() %>% 
+       mutate(year_week = as.character(paste0(year(obs_days), week(obs_days))),
+              year_week = ifelse(nchar(year_week) == 6, year_week, 
+                                 paste0(substring(year_week, first = 0, last= 4), 0, substring(year_week, 5)))) %>% 
+       group_by(year_week) %>% 
+       summarise(week_sales = sum(sales))
+     
+     })
+     
+     # observe({print(df_week_sales(), n = 100)})
+     # observe({print(df_week_OFRS(), n = 100)})
      #
      #
+     output$sales_plot_week <- renderPlot(df_week_sales() %>% ggplot() +
+                                           geom_line(aes(year_week, week_sales, group = 1)) +
+                                            scale_x_discrete(guide = guide_axis(angle = 90)) +
+                                           geom_point(df_week_OFRS(), mapping = aes(year_week, week_sales), colour = "blue") +
+                                           theme_bw())
      #
       df_table <- reactive({
 
@@ -974,7 +1072,8 @@ server <- function(input, output, session) {
           ) %>%
           select(c(EXT_LOC_ID, EXT_PROD_ID, LOC_TCD, GRANULARITY, OFR_ID, TIMESTAMP,
                    PRC_TCD, RETURNED_SALES, UNIT_SALES, SALES_UOM, LOC_CURRENCY, ZPROMO_FLAG, GROSS_SALES_AMNT, NET_SALES_AMNT,
-                   CURRENCY_ISO, UOM_ISO, FUNCTION))
+                   CURRENCY_ISO, UOM_ISO, FUNCTION)) %>% 
+          filter(UNIT_SALES > 0)
 
         df_os <-     df_OFR() %>%
           mutate(EXT_PROD_ID = input$EXT_PROD_ID,
