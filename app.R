@@ -74,11 +74,16 @@ ui <- dashboardPage(skin = "red",
 
            # 
                           
-            fluidRow(    
-                tags$h4("Sales from to"),
-                dateInput("sales_from", "Start date:", value = Sys.Date()-729, format = "dd/mm/yyyy"),
-                dateInput("sales_to", "End date:", value  = Sys.Date(), format = "dd/mm/yyyy")
-                ),             
+          
+           
+           # UI code
+           fluidRow(    
+             tags$h4("Sales from to"),
+             dateInput("sales_from", "Start date:", value = Sys.Date() - 729, format = "dd/mm/yyyy"),
+             dateInput("sales_to", "End date:", value = Sys.Date(), format = "dd/mm/yyyy"),
+             actionButton("update_dates", "Update Dates"),
+             tags$h6("For changes in the date input this action button needs to be used, for all other variables it works without")
+           ),
             
                                 
                                  
@@ -213,7 +218,7 @@ ui <- dashboardPage(skin = "red",
             fluidRow(
                 tags$h4("Sales Data"),
                 
-                
+
                 radioButtons("sales_dist", "Sales type:",
                              c("Normal" = "Normal",
                                "Intermittent" = "Intermittent")),
@@ -251,7 +256,8 @@ ui <- dashboardPage(skin = "red",
 
           uiOutput("dynamicRow"),
             # Button
-            downloadButton("downloadData", "Download"),
+            downloadButton("downloadData", "Download Sales Data"),
+            downloadButton("downloadParameters", "Download Paramters"),
            
            textOutput("inputValues")
             
@@ -294,7 +300,15 @@ server <- function(input, output, session) {
         return(df)
     })
     
-
+    sales_from <- reactiveVal(Sys.Date() - 729)
+    sales_to <- reactiveVal(Sys.Date())
+    
+    observeEvent(input$update_dates, {
+      sales_from(input$sales_from)
+      sales_to(input$sales_to)
+    })
+    
+    
 
     # 
      observeEvent(input$target_upload, {
@@ -302,6 +316,8 @@ server <- function(input, output, session) {
              df_w <- df_products_upload() 
          
              updateTextInput(session, "EXT_PROD_ID",  value = if_else(!is.null(df_w$PROD_ID_w), df_w$PROD_ID_w, ""))
+             updateTextInput(session, "EXT_LOC_ID",  value = if_else(!is.null(df_w$LOC_ID_w), df_w$LOC_ID_w, ""))
+             updateNumericInput(session, "PRICE",  value = if_else(!is.null(df_w$price), df_w$price, NULL), min = 1)
 
              updateNumericInput(session, "wday_Monday",  value = if_else(!is.null(df_w$Monday_w), df_w$Monday_w, NULL), min = 1)
              updateNumericInput(session, "wday_Tuesday",  value = if_else(!is.null(df_w$Tuesday_w), df_w$Tuesday_w, NULL), min = 1)
@@ -324,12 +340,15 @@ server <- function(input, output, session) {
              updateNumericInput(session, "month_November",  value = if_else(!is.null(df_w$November_w), df_w$November_w, NULL), min = 1)
              updateNumericInput(session, "month_December",  value = if_else(!is.null(df_w$December_w), df_w$December_w, NULL), min = 1)
 
-             updateNumericInput(session, "year_2019",  value = if_else(!is.null(df_w$w2019), df_w$w2019, NULL), min = 1)
-             updateNumericInput(session, "year_2020",  value = if_else(!is.null(df_w$w2020), df_w$w2020, NULL), min = 1)
-             updateNumericInput(session, "year_2021",  value = if_else(!is.null(df_w$w2021), df_w$w2021, NULL), min = 1)
-             updateNumericInput(session, "year_2022",  value = if_else(!is.null(df_w$w2022), df_w$w2022, NULL), min = 1)
-             updateNumericInput(session, "year_2023",  value = if_else(!is.null(df_w$w2023), df_w$w2023, NULL), min = 1)
-
+             selected_years <- seq(year(sales_from()), year(sales_to()))
+             
+             lapply(selected_years, function(i) {
+               year_input_id <- paste("i.year", i, sep = "_")
+               year_value <- if_else(!is.null(df_w[[paste0("w", i)]]), df_w[[paste0("w", i)]], NULL)
+               
+               updateNumericInput(session, year_input_id, value = year_value, min = 1)
+             })
+             
              updateNumericInput(session, "holiday_Christi.Himmelfahrt",  value = if_else(!is.null(df_w$christi_w), df_w$christi_w, NULL), min = 0)
              updateNumericInput(session, "holiday_Erster.Mai",  value = if_else(!is.null(df_w$erstermai_w), df_w$erstermai_w, NULL), min = 0)
              updateNumericInput(session, "holiday_Erster.Weihnachtstag",  value = if_else(!is.null(df_w$erster_w), df_w$erster_w, NULL), min = 0)
@@ -346,6 +365,16 @@ server <- function(input, output, session) {
              updateNumericInput(session, "holiday_Pfingsten",  value = if_else(!is.null(df_w$pfingsten_w), df_w$pfingsten_w, NULL), min = 0)
 
              updateNumericInput(session, "n_OFR",  value = if_else(!is.null(df_w$n_ofr), df_w$n_ofr, NULL), min = 0)
+             
+             
+             # expected sales
+             updateRadioButtons(session, "sales_dist",  selected = if_else(!is.null(df_w$sales_dist), df_w$sales_dist, "Normal"))
+             # 
+             updateNumericInput(session, "lambda",  value = if_else(!is.null(df_w$exp_sales), df_w$exp_sales, NULL), min = 5)
+             updateNumericInput(session, "intervall_value",  value = if_else(!is.null(df_w$intervall), df_w$intervall, NULL), min = 0)
+             updateNumericInput(session, "mean_demand_value",  value = if_else(!is.null(df_w$mean_demand), df_w$mean_demand, NULL), min = 0)
+             
+             
              })
      
      
@@ -356,8 +385,8 @@ server <- function(input, output, session) {
      observe({
 
        
-       sales_from <- input$sales_from
-       sales_to <- input$sales_to
+       sales_from <- sales_from()
+       sales_to <- sales_to()
        
        selected_years <- seq(year(sales_from), year(sales_to))
        # 
@@ -368,6 +397,9 @@ server <- function(input, output, session) {
            Year <- paste("i.year", i, sep = "_")
            numericInput(Year, paste("Weight Year", i), value = 1)
          })
+         
+   
+         
          do.call(tagList, input_list)
        })
        
@@ -378,7 +410,6 @@ server <- function(input, output, session) {
            
  
 
-     # observe({print(start_year))})
      # 
      
      
@@ -627,7 +658,7 @@ server <- function(input, output, session) {
       
       
       ### DIF weights ----
-      dates <- c(input$sales_to, input$sales_from)
+      dates <- c(sales_to(), sales_from())
       
       
       obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
@@ -664,7 +695,7 @@ server <- function(input, output, session) {
 
 
  # input weights ----
-        dates <- c(input$sales_to, input$sales_from)
+        dates <- c(sales_to(), sales_from())
 
 
         obs_days <- as_date(ymd(dates[2]):ymd(dates[1]))
@@ -708,24 +739,6 @@ server <- function(input, output, session) {
 
         df_dh <- left_join(df_d, holiday, by = c("obs_days" = "ds")) 
              
-
-        # df1 <- df_dh %>%
-        #     mutate(year = as.factor(year)) %>%
-        #     recipe( ~ .) %>%
-        #     step_dummy(wday, month, year, holiday, one_hot = T ) %>%
-        #     prep() %>%
-        #     bake(df_dh) %>%
-        #     replace(is.na(.), 0) %>%
-        #     select(where(~ any(. != 0)))
-        # df_3 <- df %>% 
-        #   as_tibble %>% 
-        #   mutate(wday = as.factor(wday), month = as.factor(month), year = as.factor(year))
-        # 
-        # df_3 <- one_hot(as.data.table(df_3))
-        # 
-        # df_3 <- df_3 %>% as_tibble %>%
-        #   replace(is.na(.), 0) %>%
-        #   select(where(~ any(. != 0)))
         
         df1 <- df_dh %>% 
           as_tibble %>% 
@@ -750,6 +763,11 @@ server <- function(input, output, session) {
                 input_df <- as_tibble(dplyr::bind_rows(input_df, df_row)) %>%
                     select(c(V1, V2))
             }
+
+ 
+
+    
+    
             names(input_df) <- c("input_id", "input_val")
             input_df
 
@@ -849,7 +867,7 @@ server <- function(input, output, session) {
         
     })
     
-    # observe({print(df_full())})
+    observe({print(df_full())})
     # 
     
     
@@ -951,14 +969,14 @@ server <- function(input, output, session) {
       
       
       
-      lambda <- df_OFR$OFR_sales[i]
+      lambda_ofr <- df_OFR$OFR_sales[i]
       
       
       
       
       ofr <- ofr %>%
         mutate(OFR_ID = df_OFR$OFR_ofr_id[i] ) %>%
-        mutate(sum = rpois(nrow(ofr), lambda = lambda)) %>%
+        mutate(sum = rpois(nrow(ofr), lambda = lambda_ofr)) %>%
         mutate(OFR_price = round(input$PRICE*(1-df_OFR$OFR_price[i]/100), 2)) 
       
       listofdfs_ofr[[i]] <- ofr
@@ -999,8 +1017,7 @@ server <- function(input, output, session) {
    # df_input <- reactive({
    #   
    # })
-    
-   # observe({print(df_input())})
+
     # 
     # observe({print(df_OFR())})
     # 
@@ -1137,7 +1154,7 @@ server <- function(input, output, session) {
         if (input$ouputfile == "BI_SALES") {
      output$downloadData <- downloadHandler(
          filename = function() {
-           ifelse(input$n_LOC_ID > 0, paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID[1], "to", tail(df_table()$EXT_LOC_ID), ".csv", sep = "_"), paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID, ".csv", sep = "_"))
+           ifelse(input$n_LOC_ID > 0, paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID[1], "to", tail(df_table()$EXT_LOC_ID), "sales_data", ".csv", sep = "_"), paste(input$EXT_PROD_ID, df_table()$EXT_LOC_ID, ".csv", sep = "_"))
          },
          content = function(file) {
              write_delim(df_table(), file, delim = ";")
@@ -1225,7 +1242,69 @@ server <- function(input, output, session) {
       #       content = function(file) {
       #           write_delim(df_table(), file, delim = ";")
       #       })
-    
+      
+      
+      # Paramters ------
+      
+      df_para <- reactive({
+        
+        
+        selected_years <- seq(year(sales_from()), year(sales_to()))
+        
+        df_para <-  tibble(
+                PROD_ID_w = input$EXT_PROD_ID,
+                LOC_ID_w = input$EXT_LOC_ID,
+                Price = input$PRICE,
+                exp_sales = input$exp_sales,
+                sales_dist = input$sales_dist,
+                intervall = input$intervall,
+                mean_demand = input$mean_demand,
+                Monday_w = input$wday_Monday,
+                Tuesday_w = input$wday_Tuesday,
+                Wednesday_w = input$wday_Wednesday,
+                Thursday_w = input$wday_Thursday,
+                Friday_w = input$wday_Friday,
+                Saturday_w = input$wday_Saturday,
+                Sunday_w = input$wday_Sunday,
+                January_w = input$month_January,
+                February_w = input$month_February,
+                March_w = input$month_March,
+                April_w = input$month_April,
+                Mai_w = input$month_May,
+                June_w = input$month_June,
+                July_w = input$month_July,
+                August_w = input$month_August,
+                September_w = input$month_September,
+                Oktober_w = input$month_October,
+                November_w = input$month_November,
+                December_w = input$month_December,
+                 )
+                
+       
+        
+        for (year in selected_years) {
+          year_input_id <- paste("i.year", year, sep = "_")
+          year_value <- input[[year_input_id]]
+          
+          df_para[[paste0("w", year)]] <- year_value
+        }
+        
+        return(df_para)
+
+      })
+      
+      
+
+      output$downloadParameters <- downloadHandler(
+            filename = function() {
+              ifelse(input$n_LOC_ID > 1, paste(input$EXT_PROD_ID, df_para()$EXT_LOC_ID[1], "to", tail(df_para()$EXT_LOC_ID), "parameters", ".csv", sep = "_"), paste(input$EXT_PROD_ID, input$EXT_LOC_ID, ".csv", sep = "_"))
+            },
+            content = function(file) {
+                write_delim(df_para(), file, delim = ";")
+            })
+      
+      
+   
 }
 
 
