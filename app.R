@@ -318,6 +318,11 @@ server <- function(input, output, session) {
              updateTextInput(session, "EXT_PROD_ID",  value = if_else(!is.null(df_w$PROD_ID_w), df_w$PROD_ID_w, ""))
              updateTextInput(session, "EXT_LOC_ID",  value = if_else(!is.null(df_w$LOC_ID_w), df_w$LOC_ID_w, ""))
              updateNumericInput(session, "PRICE",  value = if_else(!is.null(df_w$price), df_w$price, NULL), min = 1)
+             # expected sales
+             updateRadioButtons(session, "sales_dist",  selected = if_else(!is.null(df_w$sales_dist), df_w$sales_dist, "Normal"))
+             updateNumericInput(session, "exp_sales",  value = if_else(!is.null(df_w$lambda), df_w$lambda, NULL))
+             updateNumericInput(session, "intervall",  value = if_else(!is.null(df_w$intervall_value), df_w$intervall_value, NULL))
+             updateNumericInput(session, "mean_demand",  value = if_else(!is.null(input$mean_demand), df_w$intervall_value, NULL))
 
              updateNumericInput(session, "wday_Monday",  value = if_else(!is.null(df_w$Monday_w), df_w$Monday_w, NULL), min = 1)
              updateNumericInput(session, "wday_Tuesday",  value = if_else(!is.null(df_w$Tuesday_w), df_w$Tuesday_w, NULL), min = 1)
@@ -365,14 +370,6 @@ server <- function(input, output, session) {
              updateNumericInput(session, "holiday_Pfingsten",  value = if_else(!is.null(df_w$pfingsten_w), df_w$pfingsten_w, NULL), min = 0)
 
              updateNumericInput(session, "n_OFR",  value = if_else(!is.null(df_w$n_ofr), df_w$n_ofr, NULL), min = 0)
-             
-             
-             # expected sales
-             updateRadioButtons(session, "sales_dist",  selected = if_else(!is.null(df_w$sales_dist), df_w$sales_dist, "Normal"))
-             # 
-             updateNumericInput(session, "lambda",  value = if_else(!is.null(df_w$exp_sales), df_w$exp_sales, NULL), min = 5)
-             updateNumericInput(session, "intervall_value",  value = if_else(!is.null(df_w$intervall), df_w$intervall, NULL), min = 0)
-             updateNumericInput(session, "mean_demand_value",  value = if_else(!is.null(df_w$mean_demand), df_w$mean_demand, NULL), min = 0)
              
              
              })
@@ -1255,8 +1252,8 @@ server <- function(input, output, session) {
                 PROD_ID_w = input$EXT_PROD_ID,
                 LOC_ID_w = input$EXT_LOC_ID,
                 Price = input$PRICE,
-                exp_sales = input$exp_sales,
                 sales_dist = input$sales_dist,
+                exp_sales = input$lambda,
                 intervall = input$intervall,
                 mean_demand = input$mean_demand,
                 Monday_w = input$wday_Monday,
