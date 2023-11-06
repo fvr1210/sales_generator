@@ -296,7 +296,9 @@ server <- function(input, output, session) {
         inFile <- input$target_upload
         if (is.null(inFile))
             return(NULL)
-        df <- read.csv(inFile$datapath, header = TRUE,sep = input$separator)
+        df <- read.csv(inFile$datapath, header = TRUE,sep = input$separator) %>% 
+          mutate(PROD_ID_w = as.character(PROD_ID_w),
+                 LOC_ID_w = as.character(LOC_ID_w))
         return(df)
     })
     
@@ -318,7 +320,7 @@ server <- function(input, output, session) {
              updateTextInput(session, "EXT_PROD_ID",  value = if_else(!is.null(df_w$PROD_ID_w), df_w$PROD_ID_w, ""))
              updateTextInput(session, "EXT_LOC_ID",  value = if_else(!is.null(df_w$LOC_ID_w), df_w$LOC_ID_w, ""))
              updateNumericInput(session, "PRICE",  value = if_else(!is.null(df_w$price), df_w$price, NULL), min = 1)
-             # expected sales
+             # # expected sales
              updateRadioButtons(session, "sales_dist",  selected = if_else(!is.null(df_w$sales_dist), df_w$sales_dist, "Normal"))
              updateNumericInput(session, "exp_sales",  value = if_else(!is.null(df_w$lambda), df_w$lambda, NULL))
              updateNumericInput(session, "intervall",  value = if_else(!is.null(df_w$intervall_value), df_w$intervall_value, NULL))
