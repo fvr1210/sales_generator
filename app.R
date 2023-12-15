@@ -208,7 +208,8 @@ ui <- dashboardPage(skin = "red",
                                             column(2, uiOutput("OFR_END")),
                                             column(2, uiOutput("OFR_SALES")),
                                             column(2, uiOutput("OFR_PRICE")), 
-                                            column(2, uiOutput("OFR_OFR_ID"))
+                                            column(2, uiOutput("OFR_OFR_ID")),
+                                            column(3, uiOutput("OFR_RNS"))
                                           ),
                                           
                                           
@@ -495,7 +496,7 @@ server <- function(input, output, session) {
     
     output$OFR_SALES = renderUI({
       input_list <- lapply(1:input$n_OFR, function(i) {
-        # for each dynamically generated input, give a different name
+        # for each dynamically generated input, give a different ofr expected sales
         OFR_Sales <- paste("OFR_sales", i, sep = "_")
         numericInput(OFR_Sales, "Expected Offer Sales", 0)
       })
@@ -505,7 +506,7 @@ server <- function(input, output, session) {
     
     output$OFR_PRICE = renderUI({
       input_list <- lapply(1:input$n_OFR, function(i) {
-        # for each dynamically generated input, give a different name
+        # for each dynamically generated input, give a different ofr price
         OFR_Price <- paste("OFR_price", i, sep = "_")
         numericInput(OFR_Price, "OFR Price Reduction (in %)", 0)
       })
@@ -514,13 +515,22 @@ server <- function(input, output, session) {
     
     output$OFR_OFR_ID = renderUI({
       input_list <- lapply(1:input$n_OFR, function(i) {
-        # for each dynamically generated input, give a different name
+        # for each dynamically generated input, give a different ofr id
         OFR_Ofr_Id <- paste("OFR_ofr_id", i, sep = "_")
         textInput(OFR_Ofr_Id, "Offer id", value = '')
       })
       do.call(tagList, input_list)
     })
     
+    #checkbox to remove normal sales when in the time period of the offer
+    output$OFR_RNS = renderUI({
+      input_list <- lapply(1:input$n_OFR, function(i) {
+        # for each ofr define if non ofr sales should be removed
+        OFR_rns <- paste("OFR_rns", i, sep = "_")
+        checkboxInput(OFR_rns, paste0("Remove non offer sales for OFR_", i ), value = FALSE)
+      })
+      do.call(tagList, input_list)
+    })
     
   })
   
@@ -588,6 +598,15 @@ server <- function(input, output, session) {
       do.call(tagList, input_list)
     })
     
+    
+    output$OFR_RNS = renderUI({
+      input_list <- lapply(1:input$n_OFR, function(i) {
+        # for each ofr define if non ofr sales should be removed
+        OFR_rns <- paste("OFR_rns", i, sep = "_")
+        checkboxInput(OFR_rns, paste0("Remove non offer sales for OFR_", i ), value = FALSE)
+      })
+      do.call(tagList, input_list)
+    })
     
   })
   
@@ -906,6 +925,7 @@ server <- function(input, output, session) {
       OFR_ofr_id =  paste(lapply(1:input$n_OFR, function(i) {
         inputName <- paste("OFR_ofr_id", i, sep = "_")
         input[[inputName]]}))
+      
     )
     
     df_OFR <- df_OFR %>%
@@ -1012,20 +1032,86 @@ server <- function(input, output, session) {
     
     
   })
+  
+  # allow to remove non-ofr sales
+ df_rns <-   eventReactive(input$generate,{
+    
+    df_rns <-  data.frame(
+      
+      OFR_name =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_name", i, sep = "_")
+        input[[inputName]]})),
+      
+      
+      OFR_start =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_start", i, sep = "_")
+        start <- input[[inputName]]
+        start <- format(start, "%Y-%m-%d")
+        return(start)
+      })),
+      
+      OFR_end =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_end", i, sep = "_")
+        end <- input[[inputName]]
+        end <- format(end, "%Y-%m-%d")
+        return(end)
+      })),
+
+      
+      OFR_rns =  paste(lapply(1:input$n_OFR, function(i) {
+        inputName <- paste("OFR_rns", i, sep = "_")
+        input[[inputName]]}))
+      
+    )
+    
+    df_rns <- df_rns %>%
+      as_tibble() %>% mutate(OFR_start = ymd(OFR_start),
+                             OFR_end = ymd(OFR_end),
+                             OFR_rns = as.logical(OFR_rns)) %>% 
+      filter(OFR_rns == TRUE)
+ })  
+  
+  
+  
+
   # 
-  # df_input <- reactive({
-  #   
-  # })
+ observe({print(df_rns())})
+
+ 
+#remove offer sales from full dataset
+ 
+ df_full_ro <- eventReactive(input$generate,{
+
+   sales_data <- df_full()
+   promotion_data <- df_rns()
+   
+   # If promotion_df is empty, return sales_df directly
+   if (nrow(promotion_data) == 0) {
+     return(sales_data)
+   }
+   
+   # Create a logical vector indicating whether each date is within any promotion period
+   sales_data$in_promotion <- FALSE
+   
+   # Loop through each promotion and update the in_promotion vector
+   for (i in 1:nrow(promotion_data)) {
+     sales_data$in_promotion <- sales_data$in_promotion | (sales_data$obs_days >= promotion_data$OFR_start[i] & sales_data$obs_days <= promotion_data$OFR_end[i])
+   }
+   
+   # Filter out rows with promotions
+   filtered_data <- sales_data %>%
+     filter(!in_promotion)
+   
+   
+})
+
+
+ observe({print(df_full_ro())})
+  
   
   # 
-  # observe({print(df_OFR())})
   # 
-  
-  
-  
-  # 
-  # 
-  output$sales_plot_day <- renderPlot(df_full() %>% ggplot() +
+  output$sales_plot_day <- renderPlot(df_full_ro() %>% ggplot() +
                                         geom_line(aes(obs_days, ss_sales)) +
                                         geom_point(df_OFR(), mapping = aes(obs_days, sales), colour = "blue") +
                                         theme_bw())
@@ -1035,7 +1121,7 @@ server <- function(input, output, session) {
   
   df_week_sales <- reactive({
     
-    df_week_sales <- df_full() %>% 
+    df_week_sales <- df_full_ro() %>% 
       mutate(year_week = as.character(paste0(year(obs_days), week(obs_days))),
              year_week = ifelse(nchar(year_week) == 6, year_week, 
                                 paste0(substring(year_week, first = 0, last= 4), 0, substring(year_week, 5)))) %>% 
@@ -1067,7 +1153,7 @@ server <- function(input, output, session) {
   #
   df_table <- reactive({
     
-    df_s <-   df_full() %>%
+    df_s <-   df_full_ro() %>%
       mutate(EXT_PROD_ID = input$EXT_PROD_ID,
              EXT_LOC_ID = input$EXT_LOC_ID,
              LOC_TCD = input$LOC_TCD,
@@ -1142,6 +1228,10 @@ server <- function(input, output, session) {
       # Return the original dataframe when n_LOC_ID is not greater than 1
       df
     }
+    
+  
+    
+    
   })
   
   
