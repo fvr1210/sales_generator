@@ -26,12 +26,17 @@ Sys.setlocale("LC_ALL","C")
 eval(parse("scripts/create_holiday.R", encoding="UTF-8"))
 eval(parse("scripts/closed_days.R", encoding="UTF-8"))
 
+# text 
+guide_text <-  read_file("README.md", locale = locale(encoding = 'utf-8'))
+
 # Define UI for application that draws a histogram
 ui <- dashboardPage(skin = "red",
                     dashboardHeader(title = "Sales Generator", titleWidth = 320 # extend width because of the longer title
                     ),
                     # sidebare ---------
-                    dashboardSidebar(disable = TRUE,
+                    dashboardSidebar(
+                      sidebarMenuOutput("menu"),
+                      disable = FALSE,
                                      tagList(                       # Aligne the checkboxes left; code from https://stackoverflow.com/questions/29738975/how-to-align-a-group-of-checkboxgroupinput-in-r-shiny
                                        tags$head(
                                          tags$style(
@@ -56,10 +61,15 @@ ui <- dashboardPage(skin = "red",
                     ),
                     #* Sales Generator ----
                     
+                   
+                 
                     
-                    
-                    
-                    dashboardBody(tabItem(tabName = "generator",
+                    dashboardBody(
+                      tabItems(
+                      tabItem(tabName = "Guide",
+                              fluidRow(htmlOutput("guide"))),
+                      
+                      tabItem(tabName = "generator",
                                           
                                           fluidRow(
                                             
@@ -78,7 +88,7 @@ ui <- dashboardPage(skin = "red",
                                           
                                           # UI code
                                           fluidRow(    
-                                            tags$h4("Sales from to"),
+                                            tags$h4("Sales Dates"),
                                             dateInput("sales_from", "Start date:", value = Sys.Date() - 729, format = "dd/mm/yyyy"),
                                             dateInput("sales_to", "End date:", value = Sys.Date(), format = "dd/mm/yyyy"),
                                             actionButton("update_dates", "Update Dates"),
@@ -265,7 +275,7 @@ ui <- dashboardPage(skin = "red",
                                           
                                           
                                           
-                    )))
+                    ))))
 
 
 
@@ -274,7 +284,16 @@ ui <- dashboardPage(skin = "red",
 
 # Define server logic required to draw a histogram
 server <- function(input, output, session) {
-  
+
+output$menu <- renderMenu({  
+  sidebarMenu(
+    id = "tabs",
+    menuItem("Guide", tabName = "Guide", icon = icon("info")),
+    menuItem("Generator", tabName = "generator", icon = icon("chart-line")))
+})
+
+
+output$guide <- renderUI({HTML(guide_text)})
   
   output$dynamicRow <- renderUI({
     if (input$ouputfile == "BI_SALES") {
@@ -621,7 +640,7 @@ server <- function(input, output, session) {
       switch(input$sales_dist,
              Normal =  numericInput(inputId="lambda", label = 'Expected average sales value', min = 1, value=5),
              Intermittent = list(
-               numericInput(inputId="intervall", label = "Average intermittent demand interval", min = 1, value=5), 
+               numericInput(inputId="intervall", label = "Average intermittent demand interval (how many days between the sales of this product on average)", min = 1, value=5), 
                numericInput(inputId="mean_demand", label = 'Average Mean demand of non-zero demands (must be greater than 1)', min = 1.1, value=5)))
       
     })
@@ -1122,7 +1141,7 @@ server <- function(input, output, session) {
   df_week_sales <- reactive({
     
     df_week_sales <- df_full_ro() %>% 
-      mutate(year_week = as.character(paste0(year(obs_days), week(obs_days))),
+      mutate(year_week = as.character(paste0(year(obs_days), " / ", week(obs_days))),
              year_week = ifelse(nchar(year_week) == 6, year_week, 
                                 paste0(substring(year_week, first = 0, last= 4), 0, substring(year_week, 5)))) %>% 
       group_by(year_week) %>% 
