@@ -1,7 +1,3 @@
-<!DOCTYPE html>
-<html lang="en">
-<body>
-
     <h1>Sales Generator</h1>
 
     <p>This shiny app was built to generate daily sales data for the SAP CAR module. The main idea is that you can generate random sales for each day which then get weighted by different the day of the week, the months and the years. Further, you can create influencing factors and effects for holidays, other external events, and offers.</p>
@@ -30,6 +26,3 @@
     <p><strong>Generate Sales data:</strong> Once you are done with choosing the parameters click on this button to generate the fake sales data. You then get two time series graphs of the simulated sales. The first one shows the daily sales, the second one the sales by week.</p>
 
     <p><strong>Outputfile:</strong> You can choose between the format for a BI_SALES upload or to fake POSDAT. When you use BI_SALES you can add the number of locations you want to get the exact same fake sales data.</p>
-
-</body>
-</html>
